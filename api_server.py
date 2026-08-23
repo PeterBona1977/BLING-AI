@@ -69,7 +69,7 @@ async def autonomous_scanner_loop():
                             """
                             
                             completion = ai.chat.completions.create(
-                                model="llama-3.1-8b-instant",
+                                model="llama3-8b-8192",
                                 messages=[{"role": "user", "content": prompt}],
                                 response_format={"type": "json_object"},
                                 temperature=0.3
@@ -87,7 +87,7 @@ async def autonomous_scanner_loop():
         except Exception as e:
             print(f"[Scanner Loop Error]: {e}")
         
-        # Corre a cada 10 minutos (600s)
+        # Intervalo de 10 minutos (600s)
         await asyncio.sleep(600)
 
 @asynccontextmanager
@@ -135,7 +135,7 @@ def run_agent(req: AgentRequest):
     
     client = Groq(api_key=groq_key)
     completion = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model="llama3-8b-8192",
         messages=[
             {"role": "system", "content": "És o agente de inteligência de mercado BLING-AI."},
             {"role": "user", "content": req.prompt}
