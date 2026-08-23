@@ -11,7 +11,7 @@ import httpx
 from groq import Groq
 from supabase import create_client, Client
 
-# 1. Supabase Setup
+# 1. Configuração do Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Optional[Client] = None
@@ -19,7 +19,15 @@ supabase: Optional[Client] = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def save_opportunity_to_supabase(source: str, title: str, score: int, summary: str, action_plan: str):
+def save_opportunity_to_supabase(
+    source: str, 
+    title: str, 
+    score: int, 
+    summary: str, 
+    action_plan: str, 
+    social_post: str = "", 
+    product_concept: str = ""
+):
     if not supabase:
         return
     try:
@@ -29,9 +37,11 @@ def save_opportunity_to_supabase(source: str, title: str, score: int, summary: s
             "score": score,
             "summary": summary,
             "action_plan": action_plan,
+            "social_post": social_post,
+            "product_concept": product_concept,
             "status": "detected"
         }).execute()
-        print(f"[Supabase]: Gravado [{source}] - {title[:40]}...")
+        print(f"[Supabase]: Ativo gravado [{source}] - {title[:35]}... (Score: {score})")
     except Exception as e:
         print(f"[Supabase Error]: {e}")
 
@@ -49,7 +59,7 @@ def get_opportunities_from_supabase(limit: int = 25):
 async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
     items = []
     
-    # Fonte 1: Hacker News
+    # HackerNews
     try:
         r = await client.get("https://hn.algolia.com/api/v1/search_by_date?tags=story&hitsPerPage=3")
         if r.status_code == 200:
@@ -59,7 +69,7 @@ async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
     except Exception as e:
         print(f"[Fetch HN Error]: {e}")
 
-    # Fonte 2: Reddit (r/SaaS & r/SideProject)
+    # Reddit (r/SaaS e r/SideProject)
     for sub in ["SaaS", "SideProject"]:
         try:
             headers = {"User-Agent": "Mozilla/5.0 (BLING-AI Autonomous Market Scanner)"}
@@ -75,23 +85,30 @@ async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
 
     return items
 
-# 3. Loop Autónomo de Análise e Execução
+# 3. Loop Autónomo de Análise e Criação de Ativos
 async def autonomous_scanner_loop():
     while True:
         try:
             groq_key = os.getenv("GROQ_API_KEY")
             if groq_key:
                 ai = Groq(api_key=groq_key)
-                async with httpx.AsyncClient(timeout=12.0) as client:
+                async with httpx.AsyncClient(timeout=15.0) as client:
                     feed = await fetch_feed_items(client)
                     
                     for item in feed:
                         prompt = f"""
-                        Analisa esta necessidade de mercado / tópico recente: '{item['title']}'.
+                        Analisa esta necessidade de mercado / tendência recente: '{item['title']}'.
                         Fonte: {item['source']}.
-                        Identifica o valor comercial, potencial de monetização ou criação de micro-SaaS / audiência.
-                        Responde em JSON estrito:
-                        {{"score": <inteiro de 1 a 10>, "summary": "<resumo de 1 frase do problema/oportunidade>", "action_plan": "<estratégia clara de monetização, copy ou micro-produto>"}}
+                        Identifica o valor comercial, potencial de monetização e crie ativos diretos.
+                        
+                        Responde EXCLUSIVAMENTE em formato JSON estrito:
+                        {{
+                            "score": <inteiro de 1 a 10>,
+                            "summary": "<resumo conciso de 1 frase>",
+                            "action_plan": "<estratégia clara de execução>",
+                            "social_post": "<post viral formatado para LinkedIn/Twitter com gancho, 2 pontos-chave e CTA>",
+                            "product_concept": "<ideia de micro-SaaS, template Notion ou infoproduto para monetizar esta dor>"
+                        }}
                         """
                         
                         completion = ai.chat.completions.create(
@@ -110,12 +127,13 @@ async def autonomous_scanner_loop():
                                 title=item["title"],
                                 score=score,
                                 summary=data.get("summary", ""),
-                                action_plan=data.get("action_plan", "")
+                                action_plan=data.get("action_plan", ""),
+                                social_post=data.get("social_post", ""),
+                                product_concept=data.get("product_concept", "")
                             )
         except Exception as e:
             print(f"[Autonomous Scanner Error]: {e}")
             
-        # Scan a cada 8 minutos
         await asyncio.sleep(480)
 
 @asynccontextmanager
@@ -146,8 +164,9 @@ def health():
 def get_status():
     return {
         "status": "online",
-        "agent": "BLING-AI Multi-Channel Engine",
+        "agent": "BLING-AI Asset Engine",
         "active_sources": ["HackerNews", "Reddit r/SaaS", "Reddit r/SideProject"],
+        "asset_generation": "Active",
         "database": "Supabase PostgreSQL"
     }
 
@@ -165,7 +184,7 @@ def run_agent(req: AgentRequest):
     completion = client.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=[
-            {"role": "system", "content": "És o agente de inteligência e estratégia de mercado BLING-AI."},
+            {"role": "system", "content": "És o consultor e estratega de monetização BLING-AI."},
             {"role": "user", "content": req.prompt}
         ],
         temperature=0.3
