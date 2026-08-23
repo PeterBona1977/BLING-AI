@@ -38,7 +38,7 @@ async def send_telegram_alert(source: str, title: str, score: int, post: str, pr
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
             await client.post(url, json={"chat_id": chat_id, "text": message, "parse_mode": "Markdown"})
-            print(f"[Telegram]: Alerta enviado com sucesso.")
+            print(f"[Telegram]: Alerta enviado.")
     except Exception as e:
         print(f"[Telegram Error]: {e}")
 
@@ -50,7 +50,8 @@ def save_opportunity_to_supabase(
     action_plan: str, 
     social_post: str = "", 
     product_concept: str = "",
-    code_payload: str = ""
+    code_payload: str = "",
+    landing_page_html: str = ""
 ):
     if not supabase:
         return
@@ -64,9 +65,10 @@ def save_opportunity_to_supabase(
             "social_post": social_post,
             "product_concept": product_concept,
             "code_payload": code_payload,
+            "landing_page_html": landing_page_html,
             "status": "detected"
         }).execute()
-        print(f"[Supabase]: Ativo gravado [{source}] - {title[:35]}... (Score: {score})")
+        print(f"[Supabase]: Ativo com Landing Page gravado [{source}] - {title[:35]}... (Score: {score})")
     except Exception as e:
         print(f"[Supabase Error]: {e}")
 
@@ -121,30 +123,30 @@ async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
 
     return items
 
-# 4. Loop Autónomo com Geração de Código/Boilerplate
+# 4. Loop Autónomo Completo com Landing Page
 async def autonomous_scanner_loop():
     while True:
         try:
             groq_key = os.getenv("GROQ_API_KEY")
             if groq_key:
                 ai = Groq(api_key=groq_key)
-                async with httpx.AsyncClient(timeout=20.0) as client:
+                async with httpx.AsyncClient(timeout=25.0) as client:
                     feed = await fetch_feed_items(client)
                     
                     for item in feed:
                         prompt = f"""
                         Analisa esta necessidade de mercado / tendência recente: '{item['title']}'.
                         Fonte: {item['source']}.
-                        Identifica o valor comercial, potencial de monetização e crie o produto digital completo (código, post, conceito).
+                        Cria o ecossistema completo de monetização em JSON estrito.
                         
-                        Responde EXCLUSIVAMENTE em formato JSON estrito:
                         {{
                             "score": <inteiro de 1 a 10>,
                             "summary": "<resumo conciso de 1 frase>",
                             "action_plan": "<estratégia de monetização>",
                             "social_post": "<post viral formatado com gancho, 2 pontos-chave e CTA>",
                             "product_concept": "<ideia de micro-SaaS ou ferramenta>",
-                            "code_payload": "<código Python ou JavaScript funcional completo e executável que resolve este problema ou serve de boilerplate pronto>"
+                            "code_payload": "<código Python ou JavaScript funcional>",
+                            "landing_page_html": "<código HTML standalone moderno com Tailwind CDN no head, cabeçalho de alta conversão, hero section, 3 benefícios e formulário de lista de espera/checkout CTA>"
                         }}
                         """
                         
@@ -167,7 +169,8 @@ async def autonomous_scanner_loop():
                                 action_plan=data.get("action_plan", ""),
                                 social_post=data.get("social_post", ""),
                                 product_concept=data.get("product_concept", ""),
-                                code_payload=data.get("code_payload", "")
+                                code_payload=data.get("code_payload", ""),
+                                landing_page_html=data.get("landing_page_html", "")
                             )
                             
                             if score >= 8:
@@ -189,7 +192,7 @@ async def lifespan(app: FastAPI):
     yield
     task.cancel()
 
-app = FastAPI(title="BLING AI Autonomous Engine", lifespan=lifespan)
+app = FastAPI(title="BLING AI Full Product Engine", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -211,10 +214,8 @@ def health():
 def get_status():
     return {
         "status": "online",
-        "agent": "BLING-AI Autonomous Product Engine",
-        "sources": ["HackerNews", "Reddit SaaS/SideProject", "GitHub"],
-        "notifications": "Telegram Active",
-        "code_generator": "Active",
+        "agent": "BLING-AI Full Product Engine",
+        "pipeline": "Feed -> Scoring -> Assets -> Code -> Landing Page",
         "database": "Supabase PostgreSQL"
     }
 
@@ -232,7 +233,7 @@ def run_agent(req: AgentRequest):
     completion = client.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=[
-            {"role": "system", "content": "És o engenheiro e estratega de monetização BLING-AI."},
+            {"role": "system", "content": "És o consultor e engenheiro de negócios digitais BLING-AI."},
             {"role": "user", "content": req.prompt}
         ],
         temperature=0.3

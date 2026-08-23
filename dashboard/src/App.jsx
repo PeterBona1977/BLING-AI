@@ -3,15 +3,18 @@ import {
   Bot,
   Zap,
   Send,
-  Database,
-  ShieldCheck,
   TrendingUp,
   Sparkles,
   RefreshCw,
   Share2,
   Package,
   Copy,
-  Check
+  Check,
+  Code2,
+  Globe,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink
 } from 'lucide-react';
 
 const BACKEND_URL = "https://web-production-803c4.up.railway.app";
@@ -24,6 +27,7 @@ export default function App() {
   const [agentResponse, setAgentResponse] = useState("");
   const [agentLoading, setAgentLoading] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  const [openCodeId, setOpenCodeId] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -53,6 +57,14 @@ export default function App() {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handlePreviewHtml = (html) => {
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+    }
   };
 
   const handleAskAgent = async (e) => {
@@ -85,8 +97,8 @@ export default function App() {
             <Zap className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">BLING AI Engine</h1>
-            <p className="text-xs text-slate-400">Scanner Autónomo & Gerador de Ativos Digitais</p>
+            <h1 className="text-xl font-bold tracking-tight">BLING AI Autonomous Engine</h1>
+            <p className="text-xs text-slate-400">Pipeline de Produtos Digitais & Landing Pages</p>
           </div>
         </div>
 
@@ -100,7 +112,7 @@ export default function App() {
           </button>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs">
             <span className={`w-2 h-2 rounded-full ${status ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`}></span>
-            <span className="text-slate-300">{status ? 'Autonomia Ativa' : 'Offline'}</span>
+            <span className="text-slate-300">{status ? 'Autonomia 100%' : 'Offline'}</span>
           </div>
         </div>
       </header>
@@ -111,7 +123,7 @@ export default function App() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
                 <TrendingUp className="w-4 h-4" />
-                <span>Oportunidades & Ativos Prontos a Monetizar</span>
+                <span>Ecossistema de Ativos Gerados</span>
               </div>
               <span className="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full">
                 {opportunities.length} itens
@@ -120,7 +132,7 @@ export default function App() {
 
             {opportunities.length === 0 ? (
               <div className="py-12 text-center text-slate-500 text-sm">
-                A carregar oportunidades em background...
+                A carregar dados do Supabase...
               </div>
             ) : (
               <div className="space-y-4">
@@ -149,22 +161,65 @@ export default function App() {
                       </p>
                     )}
 
-                    {opp.action_plan && (
-                      <div className="p-2.5 bg-slate-900 border border-slate-800/70 rounded-lg flex items-start gap-2">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                        <p className="text-xs text-amber-200/90 font-mono">
-                          {opp.action_plan}
-                        </p>
-                      </div>
-                    )}
-
                     {opp.product_concept && (
                       <div className="p-2.5 bg-indigo-950/30 border border-indigo-500/20 rounded-lg flex items-start gap-2">
                         <Package className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
                         <div className="text-xs text-indigo-200 leading-relaxed">
-                          <span className="font-semibold text-indigo-300">Conceito de Produto: </span>
+                          <span className="font-semibold text-indigo-300">Produto: </span>
                           {opp.product_concept}
                         </div>
+                      </div>
+                    )}
+
+                    {opp.landing_page_html && (
+                      <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs font-medium text-cyan-400">
+                          <Globe className="w-3.5 h-3.5" />
+                          <span>Landing Page Pronta</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handlePreviewHtml(opp.landing_page_html)}
+                            className="text-xs text-cyan-300 hover:text-cyan-100 flex items-center gap-1 bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-1 rounded transition"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>Pré-visualizar Página</span>
+                          </button>
+                          <button
+                            onClick={() => handleCopy(opp.landing_page_html, `lp-${opp.id}`)}
+                            className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800 px-2 py-1 rounded transition"
+                          >
+                            {copiedId === `lp-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedId === `lp-${opp.id}` ? "Copiado!" : "Copiar HTML"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {opp.code_payload && (
+                      <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => setOpenCodeId(openCodeId === opp.id ? null : opp.id)}
+                            className="text-xs font-medium text-emerald-400 flex items-center gap-1.5 hover:underline"
+                          >
+                            <Code2 className="w-3.5 h-3.5" />
+                            <span>{openCodeId === opp.id ? "Ocultar Código do Produto" : "Ver Código do Produto"}</span>
+                            {openCodeId === opp.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                          <button
+                            onClick={() => handleCopy(opp.code_payload, `code-${opp.id}`)}
+                            className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded transition"
+                          >
+                            {copiedId === `code-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedId === `code-${opp.id}` ? "Copiado!" : "Copiar"}</span>
+                          </button>
+                        </div>
+                        {openCodeId === opp.id && (
+                          <pre className="mt-2 p-3 bg-slate-950 text-emerald-300 text-[11px] font-mono rounded overflow-x-auto border border-slate-900 whitespace-pre-wrap">
+                            {opp.code_payload}
+                          </pre>
+                        )}
                       </div>
                     )}
 
@@ -175,11 +230,11 @@ export default function App() {
                             <Share2 className="w-3 h-3 text-cyan-400" /> Post Pronto (LinkedIn / X)
                           </span>
                           <button
-                            onClick={() => handleCopy(opp.social_post, opp.id)}
+                            onClick={() => handleCopy(opp.social_post, `post-${opp.id}`)}
                             className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800/80 px-2 py-0.5 rounded transition"
                           >
-                            {copiedId === opp.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                            <span>{copiedId === opp.id ? "Copiado!" : "Copiar"}</span>
+                            {copiedId === `post-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedId === `post-${opp.id}` ? "Copiado!" : "Copiar"}</span>
                           </button>
                         </div>
                         <p className="text-xs text-slate-300 whitespace-pre-wrap font-sans bg-slate-950 p-2.5 rounded border border-slate-900">
@@ -198,14 +253,14 @@ export default function App() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
             <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm mb-4">
               <Bot className="w-4 h-4 text-emerald-400" />
-              <span>Prompt com o Estratega</span>
+              <span>Prompt Estratégico</span>
             </div>
 
             <form onSubmit={handleAskAgent} className="space-y-3">
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Pede uma estratégia, copy ou ideias de novos produtos..."
+                placeholder="Pede análises ou novos ativos..."
                 rows={4}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none"
               />
@@ -219,7 +274,7 @@ export default function App() {
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    <span>Executar</span>
+                    <span>Executar Agente</span>
                   </>
                 )}
               </button>
@@ -230,17 +285,6 @@ export default function App() {
                 {agentResponse}
               </div>
             )}
-          </div>
-
-          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 text-xs space-y-2.5 text-slate-400">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5"><Database className="w-3.5 h-3.5" /> Supabase</span>
-              <span className="text-emerald-400">PostgreSQL</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Geração de Ativos</span>
-              <span className="text-emerald-400">Automática</span>
-            </div>
           </div>
         </div>
       </main>
