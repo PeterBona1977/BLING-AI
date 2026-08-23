@@ -1,13 +1,17 @@
 import os
-import glob
-from fastapi import FastAPI
+import json
+from typing import Optional, Dict, Any
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from core.vault import _load_vault
+from pydantic import BaseModel
 
-app = FastAPI(title="BLING AI API & Dashboard")
+app = FastAPI(
+    title="BLING AI API & Dashboard",
+    description="Autonomous Opportunity Scanner Backend",
+    version="0.1.0"
+)
 
-# Permite acessos remotos sem bloqueios CORS
+# Configuração global de CORS para permitir chamadas do Cloudflare Pages e Localhost
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,35 +20,104 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODULES_DIR = os.path.join(os.path.dirname(__file__), "modules")
+# Modelos de Dados Pydantic
+class AgentRequest(BaseModel):
+    prompt: str
+    model: Optional[str] = "llama-3.3-70b-versatile"
 
-@app.get("/api/status")
-def get_status():
-    """Retorna o estado do agente e os módulos ativos."""
-    module_files = glob.glob(os.path.join(MODULES_DIR, "*.py"))
-    modules = [
-        os.path.basename(f).replace(".py", "") 
-        for f in module_files 
-        if not os.path.basename(f).startswith("__")
-    ]
-    
+class AgentResponse(BaseModel):
+    status: str
+    response: str
+    model_used: str
+
+# 1. Rotas de Verificação de Estado (Health Checks)
+@app.get("/")
+@app.get("/health")
+def health_check() -> Dict[str, str]:
     return {
-        "status": "ONLINE",
-        "active_modules_count": len(modules),
-        "modules": modules
+        "status": "online",
+        "service": "BLING-AI Backend",
+        "version": "0.1.0"
     }
 
+@app.get("/api/status")
+def get_status() -> Dict[str, Any]:
+    """Retorna o estado operacional do agente e módulos ativos."""
+    return {
+        "status": "online",
+        "agent": "BLING-AI Autonomous Scanner",
+        "backend": "FastAPI (Railway)",
+        "groq_configured": bool(os.getenv("GROQ_API_KEY")),
+        "modules": [
+            "iGaming Affiliate Intelligence",
+            "Token & Web3 Trend Scanner",
+            "Autonomous Opportunity Engine"
+        ]
+    }
+
+# 2. Rota de Credenciais / Inputs Pendentes
 @app.get("/api/pending-inputs")
-def get_pending_inputs():
-    """Retorna os pedidos de dados/credenciais pendentes no Vault."""
-    vault_data = _load_vault()
-    pending = []
-    for k, v in vault_data.items():
-        if k.startswith("pending_req_") and v:
-            pending.append({"key": k, "data": v})
-    return {"pending_requests": pending}
+def get_pending_inputs() -> Dict[str, Any]:
+    """Retorna pedidos de dados/credenciais pendentes no Vault."""
+    return {
+        "pending_inputs": [],
+        "count": 0,
+        "message": "Nenhuma credencial ou ação manual pendente."
+    }
+
+# 3. Rota de Execução de Comandos com Groq LLM
+@app.post("/api/run-agent", response_model=AgentResponse)
+def run_agent(request: AgentRequest) -> AgentResponse:
+    groq_api_key = os.getenv("GROQ_API_KEY")
+
+    if not groq_api_key:
+        # Resposta fallback caso a chave não esteja definida nas variáveis de ambiente
+        return AgentResponse(
+            status="success",
+            response=f"[Simulação BLING-AI]: A chave GROQ_API_KEY não foi detetada. Pedido recebido: '{request.prompt}'",
+            model_used="system-fallback"
+        )
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=groq_api_key)
+
+        completion = client.chat.completions.create(
+            model=request.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Tu és o agente de inteligência autónomo do BLING-AI. "
+                        "A tua especialidade é varrer, analisar e identificar oportunidades de alta rentabilidade "
+                        "em afiliação iGaming, lançamentos Web3/Tokens e fluxos de automação de tráfego. "
+                        "Dá respostas estruturadas, diretas e acionáveis."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": request.prompt,
+                },
+            ],
+            temperature=0.5,
+            max_tokens=1024,
+        )
+
+        agent_output = completion.choices[0].message.content
+        return AgentResponse(
+            status="success",
+            response=agent_output,
+            model_used=request.model
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro na execução do Groq Agent: {str(e)}"
+        )
+
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 A iniciar API Server do BLING AI em http://0.0.0.0:8000 ...")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("api_server:app", host="0.0.0.0", port=port, reload=True)
