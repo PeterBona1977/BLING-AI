@@ -11,7 +11,7 @@ import httpx
 from groq import Groq
 from supabase import create_client, Client
 
-# Inicialização do Supabase
+# 1. Inicialização do Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Optional[Client] = None
@@ -46,7 +46,7 @@ def get_opportunities_from_supabase(limit: int = 10):
         print(f"[Supabase Read Error]: {e}")
         return []
 
-# Background Loop Autónomo
+# 2. Loop Autónomo em Segundo Plano
 async def autonomous_scanner_loop():
     while True:
         try:
@@ -69,7 +69,7 @@ async def autonomous_scanner_loop():
                             """
                             
                             completion = ai.chat.completions.create(
-                                model="llama-3.1-70b-versatile",
+                                model="llama-3.1-8b-instant",
                                 messages=[{"role": "user", "content": prompt}],
                                 response_format={"type": "json_object"},
                                 temperature=0.3
@@ -87,7 +87,7 @@ async def autonomous_scanner_loop():
         except Exception as e:
             print(f"[Scanner Loop Error]: {e}")
         
-        # Intervalo de 10 minutos (600s)
+        # Corre a cada 10 minutos (600s)
         await asyncio.sleep(600)
 
 @asynccontextmanager
@@ -135,7 +135,7 @@ def run_agent(req: AgentRequest):
     
     client = Groq(api_key=groq_key)
     completion = client.chat.completions.create(
-        model="llama-3.1-70b-versatile",
+        model="llama-3.1-8b-instant",
         messages=[
             {"role": "system", "content": "És o agente de inteligência de mercado BLING-AI."},
             {"role": "user", "content": req.prompt}
