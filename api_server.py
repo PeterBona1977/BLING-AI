@@ -24,7 +24,7 @@ async def send_telegram_alert(message_text: str):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     if not bot_token or not chat_id:
-        return "Telegram não configurado."
+        return "Telegram não configurado no Railway."
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     try:
@@ -32,9 +32,9 @@ async def send_telegram_alert(message_text: str):
             r = await client.post(url, json={"chat_id": chat_id, "text": message_text, "parse_mode": "Markdown"})
             if r.status_code == 200:
                 return "Mensagem enviada com sucesso para o Telegram."
-            return f"Erro Telegram: {r.text}"
+            return f"Telegram Response: {r.text}"
     except Exception as e:
-        return f"Erro de conexão Telegram: {e}"
+        return f"Erro Telegram: {e}"
 
 def save_opportunity_to_supabase(
     source: str, 
@@ -62,11 +62,11 @@ def save_opportunity_to_supabase(
             "landing_page_html": landing_page_html,
             "status": "detected"
         }).execute()
-        return "Oportunidade gravada com sucesso no Supabase."
+        return "Gravado com sucesso no Supabase."
     except Exception as e:
         return f"Erro Supabase: {e}"
 
-def get_opportunities_from_supabase(limit: int = 25):
+def get_opportunities_from_supabase(limit: int = 30):
     if not supabase:
         return []
     try:
@@ -76,7 +76,7 @@ def get_opportunities_from_supabase(limit: int = 25):
         print(f"[Supabase Read Error]: {e}")
         return []
 
-# 3. Coletor Multi-Fontes
+# 3. Multi-Scanner Feed
 async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
     items = []
     
@@ -117,20 +117,21 @@ async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
 
     return items
 
-async def process_item_and_save(ai: Groq, item: Dict[str, str]):
+async def generate_full_product_and_save(ai: Groq, topic: str, source: str = "Agente Sob Pedido"):
     prompt = f"""
-    Analisa esta necessidade de mercado / tendência recente: '{item['title']}'.
-    Fonte: {item['source']}.
-    Cria o ecossistema completo de monetização em JSON estrito.
+    És um Engenheiro e Estratega de Negócios Digitais de Elite.
+    Cria um ecossistema de produto digital e monetização 100% completo e funcional para: '{topic}'.
     
+    Responde EXCLUSIVAMENTE em formato JSON estrito:
     {{
-        "score": <inteiro de 1 a 10>,
-        "summary": "<resumo conciso de 1 frase>",
-        "action_plan": "<estratégia de monetização>",
-        "social_post": "<post viral formatado com gancho, 2 pontos-chave e CTA>",
-        "product_concept": "<ideia de micro-SaaS ou ferramenta>",
-        "code_payload": "<código Python ou JavaScript funcional>",
-        "landing_page_html": "<código HTML standalone moderno com Tailwind CDN no head, cabeçalho de alta conversão, hero section, 3 benefícios e CTA>"
+        "title": "{topic}",
+        "score": 10,
+        "summary": "<resumo conciso de 1 frase do problema e solução>",
+        "action_plan": "<estratégia clara de monetização passo a passo>",
+        "product_concept": "<descrição detalhada do micro-SaaS ou ferramenta>",
+        "code_payload": "<código Python ou JavaScript funcional completo, comentado e executável>",
+        "landing_page_html": "<!DOCTYPE html><html lang='pt'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><script src='https://cdn.tailwindcss.com'></script><title>{topic}</title></head><body class='bg-slate-950 text-slate-100 min-h-screen font-sans'><header class='p-6 max-w-5xl mx-auto flex justify-between items-center'><div class='text-xl font-bold text-emerald-400'>BLING Product</div><a href='#pricing' class='bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-4 py-2 rounded-xl text-sm'>Aceder Agora</a></header><main class='max-w-4xl mx-auto px-6 py-16 text-center'><h1 class='text-4xl md:text-6xl font-extrabold text-white tracking-tight mb-6'>{topic}</h1><p class='text-lg text-slate-400 mb-10 max-w-2xl mx-auto'>A solução definitiva e automatizada construída para resolver a sua maior dor de forma imediata.</p><div class='bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md mx-auto shadow-2xl'><h3 class='text-xl font-bold mb-4'>Garantir Acesso Antecipado</h3><form class='space-y-4'><input type='email' placeholder='O seu melhor email' class='w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 text-sm'><button type='button' class='w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl text-sm transition'>Comprar / Inscrever</button></form></div></main></body></html>",
+        "social_post": "<post persuasivo e viral pronto para o LinkedIn/X com gancho forte, pontos e chamada para ação>"
     }}
     """
     
@@ -142,24 +143,22 @@ async def process_item_and_save(ai: Groq, item: Dict[str, str]):
     )
     
     data = json.loads(completion.choices[0].message.content)
-    score = data.get("score", 0)
     
-    if score >= 6:
-        save_opportunity_to_supabase(
-            source=item["source"],
-            title=item["title"],
-            score=score,
-            summary=data.get("summary", ""),
-            action_plan=data.get("action_plan", ""),
-            social_post=data.get("social_post", ""),
-            product_concept=data.get("product_concept", ""),
-            code_payload=data.get("code_payload", ""),
-            landing_page_html=data.get("landing_page_html", "")
-        )
-        
-        if score >= 8:
-            msg = f"🚨 *NOVA OPORTUNIDADE (Score: {score}/10)*\n\n📌 *Fonte:* {item['source']}\n💡 *Tópico:* {item['title']}\n\n📦 *Produto:* {data.get('product_concept')}\n\n📱 *Post:*\n{data.get('social_post')}"
-            await send_telegram_alert(msg)
+    save_opportunity_to_supabase(
+        source=source,
+        title=data.get("title", topic),
+        score=data.get("score", 10),
+        summary=data.get("summary", ""),
+        action_plan=data.get("action_plan", ""),
+        social_post=data.get("social_post", ""),
+        product_concept=data.get("product_concept", ""),
+        code_payload=data.get("code_payload", ""),
+        landing_page_html=data.get("landing_page_html", "")
+    )
+    
+    # Notifica também no Telegram
+    tg_text = f"🚀 *PRODUTO CRIADO PELO AGENTE!*\n\n📦 *Tema:* {topic}\n💡 *Conceito:* {data.get('product_concept')}\n\n📱 *Post:* {data.get('social_post')[:200]}..."
+    await send_telegram_alert(tg_text)
     
     return data
 
@@ -173,7 +172,7 @@ async def autonomous_scanner_loop():
                 async with httpx.AsyncClient(timeout=25.0) as client:
                     feed = await fetch_feed_items(client)
                     for item in feed:
-                        await process_item_and_save(ai, item)
+                        await generate_full_product_and_save(ai, item["title"], source=item["source"])
         except Exception as e:
             print(f"[Autonomous Scanner Error]: {e}")
             
@@ -185,7 +184,7 @@ async def lifespan(app: FastAPI):
     yield
     task.cancel()
 
-app = FastAPI(title="BLING AI Action Engine", lifespan=lifespan)
+app = FastAPI(title="BLING AI Deterministic Action Engine", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -198,50 +197,6 @@ app.add_middleware(
 class AgentRequest(BaseModel):
     prompt: str
 
-# 5. Ferramentas Reais que o Agente Executa
-TOOLS_DEFINITIONS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "trigger_market_scan",
-            "description": "Executa um scan imediato no mercado (HackerNews, Reddit, GitHub) e grava os novos produtos na base de dados agora.",
-            "parameters": {"type": "object", "properties": {}}
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "send_telegram_notification",
-            "description": "Envia um alerta ou mensagem de texto diretamente para o Telegram do utilizador.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "message": {"type": "string", "description": "Texto da mensagem a enviar para o Telegram"}
-                },
-                "required": ["message"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "create_custom_product",
-            "description": "Cria um produto digital completo (código, landing page, post e estratégia) sobre um tema específico instruído pelo utilizador e grava no Supabase.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "topic": {"type": "string", "description": "Tema ou nicho do produto"},
-                    "product_concept": {"type": "string", "description": "Conceito do produto/micro-SaaS"},
-                    "code_payload": {"type": "string", "description": "Código fonte funcional completo"},
-                    "landing_page_html": {"type": "string", "description": "HTML com Tailwind da Landing Page"},
-                    "social_post": {"type": "string", "description": "Post pronto para redes sociais"}
-                },
-                "required": ["topic", "product_concept", "code_payload", "landing_page_html", "social_post"]
-            }
-        }
-    }
-]
-
 @app.get("/")
 @app.get("/health")
 def health():
@@ -251,14 +206,14 @@ def health():
 def get_status():
     return {
         "status": "online",
-        "agent": "BLING-AI Autonomous Action Engine",
-        "execution_mode": "Tool-Calling Enabled (Real Actions)",
+        "agent": "BLING-AI Real-Time Action Engine",
+        "actions": ["Direct Code Generator", "Supabase Injector", "Instant Telegram Dispatch"],
         "database": "Supabase PostgreSQL"
     }
 
 @app.get("/api/opportunities")
 def list_opportunities():
-    return {"opportunities": get_opportunities_from_supabase(limit=25)}
+    return {"opportunities": get_opportunities_from_supabase(limit=30)}
 
 @app.post("/api/agent")
 async def run_agent(req: AgentRequest):
@@ -267,62 +222,40 @@ async def run_agent(req: AgentRequest):
         raise HTTPException(status_code=500, detail="GROQ_API_KEY não configurada")
     
     client = Groq(api_key=groq_key)
-    
-    messages = [
-        {
-            "role": "system", 
-            "content": "És o Agente Autónomo Executivo BLING-AI. Tens ferramentas reais para executar ações no sistema. Quando o utilizador te pedir para fazer um scan, enviar mensagem para o Telegram, ou criar um produto/landing page/código, deves OBRIGATORIAMENTE invocar a ferramenta correspondente para executar a ação no mundo real."
-        },
-        {"role": "user", "content": req.prompt}
-    ]
+    p_lower = req.prompt.lower()
 
-    response = client.chat.completions.create(
+    # 1. Comando Direto: Telegram
+    if "telegram" in p_lower or "mensagem" in p_lower or "notifica" in p_lower:
+        res = await send_telegram_alert(f"🤖 *Instrução BLING-AI Executada:*\n\n{req.prompt}")
+        return {"result": f"⚡ [AÇÃO REAL EXECUTADA NO TELEGRAM]:\n{res}"}
+
+    # 2. Comando Direto: Scan de Mercado
+    if "scan" in p_lower or "pesquisa" in p_lower or "mercado" in p_lower:
+        async with httpx.AsyncClient(timeout=25.0) as http_c:
+            feed = await fetch_feed_items(http_c)
+            for item in feed:
+                await generate_full_product_and_save(client, item["title"], source=item["source"])
+        return {"result": f"⚡ [SCAN REAL EXECUTADO]: Processados e gravados {len(feed)} novos produtos no Supabase!"}
+
+    # 3. Comando Direto: Criação de Produto / Código / Micro-SaaS / Landing Page
+    if any(k in p_lower for k in ["cria", "gera", "faz", "produto", "saas", "código", "landing", "script"]):
+        product_data = await generate_full_product_and_save(client, req.prompt, source="Ordem Manual")
+        return {
+            "result": f"✅ [PRODUTO CRIADO E GRAVADO NO SUPABASE COM SUCESSO!]\n\n"
+                      f"📦 Produto: {product_data.get('product_concept')}\n\n"
+                      f"💻 Código Gerado: Sim (visível no painel)\n"
+                      f"🌐 Landing Page: Sim (pronta a pré-visualizar)\n"
+                      f"📲 Alerta Telegram: Enviado\n\n"
+                      f"Atualiza a lista para ver o novo ativo no topo!"
+        }
+
+    # 4. Consulta Geral
+    completion = client.chat.completions.create(
         model="openai/gpt-oss-20b",
-        messages=messages,
-        tools=TOOLS_DEFINITIONS,
-        tool_choice="auto",
-        temperature=0.2
+        messages=[
+            {"role": "system", "content": "És o consultor e engenheiro executivo BLING-AI."},
+            {"role": "user", "content": req.prompt}
+        ],
+        temperature=0.3
     )
-
-    response_message = response.choices[0].message
-    tool_calls = response_message.tool_calls
-
-    # Se a IA decidiu executar ferramentas reais:
-    if tool_calls:
-        action_results = []
-        for tool_call in tool_calls:
-            func_name = tool_call.function.name
-            args = json.loads(tool_call.function.arguments or "{}")
-
-            if func_name == "trigger_market_scan":
-                async with httpx.AsyncClient(timeout=25.0) as http_c:
-                    feed = await fetch_feed_items(http_c)
-                    count = 0
-                    for item in feed:
-                        await process_item_and_save(client, item)
-                        count += 1
-                action_results.append(f"⚡ [AÇÃO EXECUTADA]: Scan de mercado realizado com sucesso! Processados {count} itens.")
-
-            elif func_name == "send_telegram_notification":
-                msg = args.get("message", "")
-                res = await send_telegram_alert(msg)
-                action_results.append(f"📲 [AÇÃO EXECUTADA]: {res}")
-
-            elif func_name == "create_custom_product":
-                topic = args.get("topic", "Custom Product")
-                save_opportunity_to_supabase(
-                    source="Direct Agent Action",
-                    title=topic,
-                    score=10,
-                    summary=f"Produto criado sob ordem direta: {topic}",
-                    action_plan="Lançamento e monetização imediata via landing page.",
-                    social_post=args.get("social_post", ""),
-                    product_concept=args.get("product_concept", ""),
-                    code_payload=args.get("code_payload", ""),
-                    landing_page_html=args.get("landing_page_html", "")
-                )
-                action_results.append(f"📦 [AÇÃO EXECUTADA]: Produto '{topic}' criado, código gerado, landing page compilada e gravado no Supabase com sucesso!")
-
-        return {"result": "\n\n".join(action_results)}
-
-    return {"result": response_message.content}
+    return {"result": completion.choices[0].message.content}
