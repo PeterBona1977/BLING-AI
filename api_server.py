@@ -11,13 +11,36 @@ import httpx
 from groq import Groq
 from supabase import create_client, Client
 
-# 1. Configuração do Supabase
+# 1. Supabase Setup
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Optional[Client] = None
 
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# 2. Telegram Notifier
+async def send_telegram_alert(source: str, title: str, score: int, post: str, product: str):
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if not bot_token or not chat_id:
+        return
+
+    message = (
+        f"🚨 *NOVA OPORTUNIDADE (Score: {score}/10)*\n\n"
+        f"📌 *Fonte:* {source}\n"
+        f"💡 *Tópico:* {title}\n\n"
+        f"📦 *Produto:* {product}\n\n"
+        f"📱 *Post de Conversão:*\n{post}"
+    )
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            await client.post(url, json={"chat_id": chat_id, "text": message, "parse_mode": "Markdown"})
+            print(f"[Telegram]: Alerta enviado com sucesso.")
+    except Exception as e:
+        print(f"[Telegram Error]: {e}")
 
 def save_opportunity_to_supabase(
     source: str, 
@@ -26,7 +49,8 @@ def save_opportunity_to_supabase(
     summary: str, 
     action_plan: str, 
     social_post: str = "", 
-    product_concept: str = ""
+    product_concept: str = "",
+    code_payload: str = ""
 ):
     if not supabase:
         return
@@ -39,6 +63,7 @@ def save_opportunity_to_supabase(
             "action_plan": action_plan,
             "social_post": social_post,
             "product_concept": product_concept,
+            "code_payload": code_payload,
             "status": "detected"
         }).execute()
         print(f"[Supabase]: Ativo gravado [{source}] - {title[:35]}... (Score: {score})")
@@ -55,7 +80,7 @@ def get_opportunities_from_supabase(limit: int = 25):
         print(f"[Supabase Read Error]: {e}")
         return []
 
-# 2. Coletor Multi-Fontes
+# 3. Multi-Scanner Feed
 async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
     items = []
     
@@ -69,45 +94,57 @@ async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
     except Exception as e:
         print(f"[Fetch HN Error]: {e}")
 
-    # Reddit (r/SaaS e r/SideProject)
+    # Reddit
     for sub in ["SaaS", "SideProject"]:
         try:
-            headers = {"User-Agent": "Mozilla/5.0 (BLING-AI Autonomous Market Scanner)"}
+            headers = {"User-Agent": "Mozilla/5.0 (BLING-AI Market Scanner)"}
             r = await client.get(f"https://www.reddit.com/r/{sub}/new.json?limit=2", headers=headers)
             if r.status_code == 200:
-                posts = r.json().get("data", {}).get("children", [])
-                for p in posts:
+                for p in r.json().get("data", {}).get("children", []):
                     title = p.get("data", {}).get("title")
                     if title:
                         items.append({"source": f"Reddit r/{sub}", "title": title})
         except Exception as e:
             print(f"[Fetch Reddit {sub} Error]: {e}")
 
+    # GitHub
+    try:
+        headers = {"User-Agent": "BLING-AI Scanner"}
+        r = await client.get("https://api.github.com/search/repositories?q=stars:>100+created:>2026-01-01&sort=stars&order=desc&per_page=2", headers=headers)
+        if r.status_code == 200:
+            for repo in r.json().get("items", []):
+                name = repo.get("full_name")
+                desc = repo.get("description") or "Sem descrição"
+                items.append({"source": "GitHub Trending", "title": f"{name}: {desc}"})
+    except Exception as e:
+        print(f"[Fetch GitHub Error]: {e}")
+
     return items
 
-# 3. Loop Autónomo de Análise e Criação de Ativos
+# 4. Loop Autónomo com Geração de Código/Boilerplate
 async def autonomous_scanner_loop():
     while True:
         try:
             groq_key = os.getenv("GROQ_API_KEY")
             if groq_key:
                 ai = Groq(api_key=groq_key)
-                async with httpx.AsyncClient(timeout=15.0) as client:
+                async with httpx.AsyncClient(timeout=20.0) as client:
                     feed = await fetch_feed_items(client)
                     
                     for item in feed:
                         prompt = f"""
                         Analisa esta necessidade de mercado / tendência recente: '{item['title']}'.
                         Fonte: {item['source']}.
-                        Identifica o valor comercial, potencial de monetização e crie ativos diretos.
+                        Identifica o valor comercial, potencial de monetização e crie o produto digital completo (código, post, conceito).
                         
                         Responde EXCLUSIVAMENTE em formato JSON estrito:
                         {{
                             "score": <inteiro de 1 a 10>,
                             "summary": "<resumo conciso de 1 frase>",
-                            "action_plan": "<estratégia clara de execução>",
-                            "social_post": "<post viral formatado para LinkedIn/Twitter com gancho, 2 pontos-chave e CTA>",
-                            "product_concept": "<ideia de micro-SaaS, template Notion ou infoproduto para monetizar esta dor>"
+                            "action_plan": "<estratégia de monetização>",
+                            "social_post": "<post viral formatado com gancho, 2 pontos-chave e CTA>",
+                            "product_concept": "<ideia de micro-SaaS ou ferramenta>",
+                            "code_payload": "<código Python ou JavaScript funcional completo e executável que resolve este problema ou serve de boilerplate pronto>"
                         }}
                         """
                         
@@ -129,8 +166,18 @@ async def autonomous_scanner_loop():
                                 summary=data.get("summary", ""),
                                 action_plan=data.get("action_plan", ""),
                                 social_post=data.get("social_post", ""),
-                                product_concept=data.get("product_concept", "")
+                                product_concept=data.get("product_concept", ""),
+                                code_payload=data.get("code_payload", "")
                             )
+                            
+                            if score >= 8:
+                                await send_telegram_alert(
+                                    source=item["source"],
+                                    title=item["title"],
+                                    score=score,
+                                    post=data.get("social_post", ""),
+                                    product=data.get("product_concept", "")
+                                )
         except Exception as e:
             print(f"[Autonomous Scanner Error]: {e}")
             
@@ -164,9 +211,10 @@ def health():
 def get_status():
     return {
         "status": "online",
-        "agent": "BLING-AI Asset Engine",
-        "active_sources": ["HackerNews", "Reddit r/SaaS", "Reddit r/SideProject"],
-        "asset_generation": "Active",
+        "agent": "BLING-AI Autonomous Product Engine",
+        "sources": ["HackerNews", "Reddit SaaS/SideProject", "GitHub"],
+        "notifications": "Telegram Active",
+        "code_generator": "Active",
         "database": "Supabase PostgreSQL"
     }
 
@@ -184,7 +232,7 @@ def run_agent(req: AgentRequest):
     completion = client.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=[
-            {"role": "system", "content": "És o consultor e estratega de monetização BLING-AI."},
+            {"role": "system", "content": "És o engenheiro e estratega de monetização BLING-AI."},
             {"role": "user", "content": req.prompt}
         ],
         temperature=0.3
