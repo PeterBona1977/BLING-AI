@@ -1,253 +1,154 @@
 import React, { useState, useEffect } from 'react';
 import {
   Bot,
-  Send,
   Activity,
-  Search,
-  Terminal,
-  DollarSign,
-  CheckCircle,
-  AlertCircle,
-  RefreshCw,
   Zap,
-  Globe,
-  Database
+  Send,
+  Database,
+  ShieldCheck,
+  TrendingUp,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 
-const API_URL = "https://web-production-803c4.up.railway.app";
+const BACKEND_URL = "https://web-production-803c4.up.railway.app";
 
-function App() {
-  const [prompt, setPrompt] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [response, setResponse] = useState(null);
-  const [error, setError] = useState(null);
-  const [apiStatus, setApiStatus] = useState('checking');
-  const [history, setHistory] = useState([]);
+export default function App() {
+  const [status, setStatus] = useState(null);
+  const [opportunities, setOpportunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [prompt, setPrompt] = useState("");
+  const [agentResponse, setAgentResponse] = useState("");
+  const [agentLoading, setAgentLoading] = useState(false);
 
-  // Verificar estado da API
-  const checkHealth = async () => {
+  const fetchData = async () => {
     try {
-      const res = await fetch(`${API_URL}/health`);
-      if (res.ok) {
-        setApiStatus('online');
-      } else {
-        setApiStatus('offline');
+      setLoading(true);
+      const [statusRes, oppsRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/status`).then(res => res.json()).catch(() => null),
+        fetch(`${BACKEND_URL}/api/opportunities`).then(res => res.json()).catch(() => ({ opportunities: [] }))
+      ]);
+      setStatus(statusRes);
+      if (oppsRes && oppsRes.opportunities) {
+        setOpportunities(oppsRes.opportunities);
       }
-    } catch (err) {
-      setApiStatus('offline');
-    }
-  };
-
-  useEffect(() => {
-    checkHealth();
-    const interval = setInterval(checkHealth, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!prompt.trim() || loading) return;
-
-    setLoading(true);
-    setError(null);
-    setResponse(null);
-
-    try {
-      const res = await fetch(`${API_URL}/run`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setResponse(data);
-        setHistory(prev => [{ prompt, timestamp: new Date().toLocaleTimeString(), status: 'success' }, ...prev]);
-      } else {
-        setError(data.detail || 'Erro ao processar pedido.');
-        setHistory(prev => [{ prompt, timestamp: new Date().toLocaleTimeString(), status: 'error' }, ...prev]);
-      }
-    } catch (err) {
-      setError('Não foi possível ligar ao servidor do BLING AI.');
-      setHistory(prev => [{ prompt, timestamp: new Date().toLocaleTimeString(), status: 'error' }, ...prev]);
+    } catch (e) {
+      console.error("Erro ao carregar dados:", e);
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleAskAgent = async (e) => {
+    e.preventDefault();
+    if (!prompt.trim()) return;
+
+    setAgentLoading(true);
+    setAgentResponse("");
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await res.json();
+      setAgentResponse(data.result || "Sem resposta do agente.");
+    } catch (err) {
+      setAgentResponse("Erro ao contactar o agente.");
+    } finally {
+      setAgentLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-      {/* Top Navbar */}
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-500/30">
-            <Bot className="w-6 h-6 text-white" />
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
+      <header className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-slate-800 gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+            <Zap className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="font-bold text-xl tracking-wide bg-gradient-to-r from-white via-slate-200 to-indigo-400 bg-clip-text text-transparent">
-              BLING AI
-            </h1>
-            <p className="text-xs text-slate-400">Autonomous Opportunity Scanner</p>
+            <h1 className="text-xl font-bold tracking-tight">BLING AI Autonomous Engine</h1>
+            <p className="text-xs text-slate-400">Agente de Inteligência e Automação de Mercado</p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700">
-            <span className={`w-2 h-2 rounded-full ${apiStatus === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-            <span className="capitalize text-slate-300">Backend: {apiStatus}</span>
-          </div>
+        <div className="flex items-center gap-3">
           <button
-            onClick={checkHealth}
-            className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
-            title="Atualizar Estado"
+            onClick={fetchData}
+            className="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 transition"
+            title="Atualizar dados"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs">
+            <span className={`w-2 h-2 rounded-full ${status ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`}></span>
+            <span className="text-slate-300">{status ? 'Autonomous Loop Ativo' : 'Offline'}</span>
+          </div>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Left Column: Command & Input Panel */}
+      <main className="max-w-6xl mx-auto mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-
-          {/* Executive Input Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
-            <div className="flex items-center space-x-2 mb-4 text-indigo-400 font-semibold text-sm">
-              <Zap className="w-4 h-4" />
-              <span>INSTRUÇÕES DO AGENTE</span>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
+                <TrendingUp className="w-4 h-4" />
+                <span>Oportunidades Detetadas em Tempo Real (Supabase)</span>
+              </div>
+              <span className="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full">
+                {opportunities.length} registos
+              </span>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Ex: Procura oportunidades de afiliados iGaming ou analisa novos tokens Solana em tendência..."
-                  className="w-full h-32 bg-slate-950 border border-slate-800 rounded-lg p-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
-                />
+            {opportunities.length === 0 ? (
+              <div className="py-12 text-center text-slate-500 text-sm">
+                Nenhuma oportunidade detetada de momento. O scanner corre a cada 10 minutos.
               </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-500">
-                  Pressiona Executar para acionar a varredura autónoma
-                </span>
-                <button
-                  type="submit"
-                  disabled={loading || !prompt.trim()}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-lg text-sm font-medium transition-all flex items-center space-x-2 shadow-lg shadow-indigo-600/20"
-                >
-                  {loading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>A processar...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" />
-                      <span>Executar Agente</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Results Display Window */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl min-h-[300px]">
-            <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-              <div className="flex items-center space-x-2 text-slate-300 font-semibold text-sm">
-                <Terminal className="w-4 h-4 text-emerald-400" />
-                <span>SAÍDA DA EXECUÇÃO</span>
-              </div>
-            </div>
-
-            {loading && (
-              <div className="flex flex-col items-center justify-center py-16 space-y-3 text-slate-400">
-                <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
-                <p className="text-sm">O agente está a analisar o pedido e a recolher dados...</p>
-              </div>
-            )}
-
-            {error && (
-              <div className="p-4 bg-rose-950/30 border border-rose-800/50 rounded-lg flex items-start space-x-3 text-rose-300">
-                <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-400 mt-0.5" />
-                <div className="text-sm">
-                  <p className="font-semibold">Erro na Execução</p>
-                  <p className="text-xs text-rose-400/80 mt-1">{error}</p>
-                </div>
-              </div>
-            )}
-
-            {response && !loading && (
-              <div className="space-y-4">
-                <div className="p-4 bg-emerald-950/20 border border-emerald-800/40 rounded-lg flex items-center space-x-3 text-emerald-300 text-sm">
-                  <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                  <span>Análise concluída com sucesso!</span>
-                </div>
-
-                <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 overflow-x-auto">
-                  <pre className="text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed">
-                    {typeof response === 'object' ? JSON.stringify(response, null, 2) : response}
-                  </pre>
-                </div>
-              </div>
-            )}
-
-            {!response && !loading && !error && (
-              <div className="text-center py-16 text-slate-600 text-sm">
-                Aguardando execução. Introduz um comando para visualizar os resultados aqui.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Column: System Analytics & Quick Actions */}
-        <div className="space-y-6">
-          {/* Status Metrics */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
-            <h3 className="text-xs font-bold text-slate-400 tracking-wider uppercase">Métricas do Sistema</h3>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
-                <div className="flex items-center space-x-2 text-slate-400 text-xs mb-1">
-                  <Globe className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Ambiente</span>
-                </div>
-                <p className="text-sm font-semibold text-slate-200">Railway API</p>
-              </div>
-
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
-                <div className="flex items-center space-x-2 text-slate-400 text-xs mb-1">
-                  <Database className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Modelo AI</span>
-                </div>
-                <p className="text-sm font-semibold text-slate-200">Groq LLM</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Activity Log */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-            <h3 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-3">Histórico Recente</h3>
-
-            {history.length === 0 ? (
-              <p className="text-xs text-slate-600">Nenhuma atividade registada nesta sessão.</p>
             ) : (
-              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
-                {history.map((item, idx) => (
-                  <div key={idx} className="bg-slate-950 p-2.5 rounded border border-slate-800/60 text-xs space-y-1">
-                    <div className="flex items-center justify-between text-slate-400">
-                      <span className="font-mono text-[10px]">{item.timestamp}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${item.status === 'success' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/50' : 'bg-rose-950 text-rose-400 border border-rose-800/50'}`}>
-                        {item.status}
-                      </span>
+              <div className="space-y-3">
+                {opportunities.map((opp) => (
+                  <div key={opp.id} className="p-4 bg-slate-950/60 border border-slate-800/80 rounded-xl hover:border-slate-700 transition">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                            {opp.source}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {new Date(opp.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <h3 className="font-medium text-slate-200 mt-1.5 text-sm md:text-base">{opp.title}</h3>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          Score: {opp.score}/10
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-slate-300 truncate">{item.prompt}</p>
+
+                    {opp.summary && (
+                      <p className="text-xs text-slate-400 mt-2 line-clamp-2">
+                        {opp.summary}
+                      </p>
+                    )}
+
+                    {opp.action_plan && (
+                      <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex items-start gap-2">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-200/90 leading-relaxed font-mono">
+                          {opp.action_plan}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -255,9 +156,60 @@ function App() {
           </div>
         </div>
 
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm mb-4">
+              <Bot className="w-4 h-4 text-emerald-400" />
+              <span>Prompt Manual com o Agente</span>
+            </div>
+
+            <form onSubmit={handleAskAgent} className="space-y-3">
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Pede uma análise ou instrução direta ao agente..."
+                rows={4}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none"
+              />
+              <button
+                type="submit"
+                disabled={agentLoading || !prompt.trim()}
+                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-semibold text-sm py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition"
+              >
+                {agentLoading ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>Executar Agente</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {agentResponse && (
+              <div className="mt-4 p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
+                {agentResponse}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 text-xs space-y-2.5 text-slate-400">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5"><Database className="w-3.5 h-3.5" /> Base de Dados</span>
+              <span className="text-emerald-400">PostgreSQL (Supabase)</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Motor LLM</span>
+              <span className="text-slate-200">Groq High-Speed</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> Frequência de Scan</span>
+              <span className="text-slate-200">10 Minutos</span>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );
 }
-
-export default App;
