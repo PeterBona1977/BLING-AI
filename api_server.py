@@ -69,7 +69,7 @@ async def autonomous_scanner_loop():
                             """
                             
                             completion = ai.chat.completions.create(
-                                model="llama3-8b-8192",
+                                model="openai/gpt-oss-20b",
                                 messages=[{"role": "user", "content": prompt}],
                                 response_format={"type": "json_object"},
                                 temperature=0.3
@@ -135,7 +135,7 @@ def run_agent(req: AgentRequest):
     
     client = Groq(api_key=groq_key)
     completion = client.chat.completions.create(
-        model="llama3-8b-8192",
+        model="openai/gpt-oss-20b",
         messages=[
             {"role": "system", "content": "És o agente de inteligência de mercado BLING-AI."},
             {"role": "user", "content": req.prompt}
