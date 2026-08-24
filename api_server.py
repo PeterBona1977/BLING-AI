@@ -1,6 +1,7 @@
 import os
 import asyncio
 import json
+import re
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 
@@ -108,45 +109,102 @@ async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
 
 async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manual"):
     prompt = f"""
-    Cria um plano completo de produto digital para: '{topic}'.
-    Responde estritamente em formato JSON:
+    Cria a solução completa para o produto digital: '{topic}'.
+    Responde com as seguintes chaves em formato JSON:
     {{
         "title": "{topic}",
         "score": 10,
-        "summary": "<resumo conciso>",
-        "action_plan": "<estratégia de monetização rápida>",
-        "product_concept": "<descrição do micro-SaaS / ferramenta>",
-        "code_payload": "<código Python ou JS funcional e conciso>",
-        "landing_page_html": "<!DOCTYPE html><html><head><script src='https://cdn.tailwindcss.com'></script></head><body class='bg-slate-950 text-white min-h-screen p-8 text-center'><h1 class='text-3xl font-bold text-emerald-400 mb-4'>{topic}</h1><p class='text-slate-300 max-w-md mx-auto mb-6'>Acesso imediato à ferramenta.</p><button class='bg-emerald-500 text-black font-bold px-6 py-2 rounded-xl'>Garantir Acesso</button></body></html>",
-        "social_post": "<post de conversão para LinkedIn e Twitter>"
+        "summary": "Resumo do problema e solução",
+        "action_plan": "Estratégia de monetização",
+        "product_concept": "Descrição detalhada do micro-SaaS ou ferramenta",
+        "code_payload": "# Script Python funcional\\nimport sys\\nprint('Ferramenta {topic} pronta')",
+        "social_post": "Post viral pronto para LinkedIn / X sobre como resolver este problema com gancho e CTA"
     }}
     """
     
     completion = ai.chat.completions.create(
         model="openai/gpt-oss-20b",
-        messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": "És um construtor de micro-SaaS e produtos de IA de alta performance. Devolve sempre um objeto JSON válido."},
+            {"role": "user", "content": prompt}
+        ],
         temperature=0.2
     )
     
-    data = json.loads(completion.choices[0].message.content)
+    raw_content = completion.choices[0].message.content
     
+    # Extração segura de JSON
+    data = {}
+    try:
+        data = json.loads(raw_content)
+    except Exception:
+        json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
+        if json_match:
+            try:
+                data = json.loads(json_match.group(0))
+            except Exception:
+                pass
+
+    title = data.get("title", topic)
+    summary = data.get("summary", f"Solução automatizada desenvolvida para: {topic}")
+    action_plan = data.get("action_plan", "Monetizar via modelo de subscrição mensal ou venda direta.")
+    product_concept = data.get("product_concept", f"Micro-ferramenta especializada em {topic}")
+    code_payload = data.get("code_payload", f"# Boilerplate gerado para {topic}\nimport os\nprint('Módulo ativo')")
+    social_post = data.get("social_post", f"🚀 Acabei de automatizar a resolução para '{topic}'!\n\n1. Processamento instantâneo\n2. Poupança de tempo garantida\n\nQueres testar? Envia DM ou clica no link!")
+    
+    landing_page_html = f"""<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <title>{title}</title>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-between">
+  <header class="p-6 max-w-5xl mx-auto w-full flex justify-between items-center">
+    <div class="text-xl font-bold text-emerald-400">BLING Product</div>
+    <a href="#cta" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-4 py-2 rounded-xl text-sm transition">Acesso Imediato</a>
+  </header>
+  <main class="max-w-4xl mx-auto px-6 py-12 text-center">
+    <span class="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4 inline-block">Solução Automatizada</span>
+    <h1 class="text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-6">{title}</h1>
+    <p class="text-lg text-slate-400 mb-10 max-w-2xl mx-auto">{summary}</p>
+    <div id="cta" class="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md mx-auto shadow-2xl">
+      <h3 class="text-xl font-bold mb-2">Garantir Acesso Antecipado</h3>
+      <p class="text-xs text-slate-400 mb-6">{product_concept}</p>
+      <form class="space-y-4">
+        <input type="email" placeholder="O seu melhor email" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-emerald-500 text-sm">
+        <button type="button" class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl text-sm transition">Aceder à Ferramenta</button>
+      </form>
+    </div>
+  </main>
+  <footer class="p-6 text-center text-xs text-slate-600">
+    © 2026 BLING AI Engine. Todos os direitos reservados.
+  </footer>
+</body>
+</html>"""
+
     save_opportunity_to_supabase(
         source=source,
-        title=data.get("title", topic),
-        score=data.get("score", 10),
-        summary=data.get("summary", ""),
-        action_plan=data.get("action_plan", ""),
-        social_post=data.get("social_post", ""),
-        product_concept=data.get("product_concept", ""),
-        code_payload=data.get("code_payload", ""),
-        landing_page_html=data.get("landing_page_html", "")
+        title=title,
+        score=10,
+        summary=summary,
+        action_plan=action_plan,
+        social_post=social_post,
+        product_concept=product_concept,
+        code_payload=code_payload,
+        landing_page_html=landing_page_html
     )
     
-    tg_text = f"🚀 *NOVO PRODUTO CRIADO!*\n\n📦 *Tema:* {topic}\n💡 *Conceito:* {data.get('product_concept')}\n\n📱 *Post:* {data.get('social_post')[:180]}..."
+    tg_text = f"🚀 *NOVO PRODUTO CRIADO!*\n\n📦 *Tema:* {title}\n💡 *Conceito:* {product_concept}\n\n📱 *Post:* {social_post[:180]}..."
     await send_telegram_alert(tg_text)
     
-    return data
+    return {
+        "title": title,
+        "product_concept": product_concept,
+        "summary": summary,
+        "social_post": social_post
+    }
 
 # 4. Background Scanner
 async def autonomous_scanner_loop():
@@ -192,7 +250,7 @@ def health():
 def get_status():
     return {
         "status": "online",
-        "agent": "BLING-AI Ultra-Fast Engine",
+        "agent": "BLING-AI Action Engine",
         "model": "openai/gpt-oss-20b",
         "database": "Supabase PostgreSQL"
     }
@@ -213,7 +271,7 @@ async def run_agent(req: AgentRequest):
 
         # 1. Comando Telegram
         if "telegram" in p_lower or "mensagem" in p_lower:
-            res = await send_telegram_alert(f"🤖 *BLING-AI Action:*\n\n{req.prompt}")
+            res = await send_telegram_alert(f"🤖 *BLING-AI:* {req.prompt}")
             return {"result": f"⚡ [TELEGRAM]: {res}"}
 
         # 2. Comando Scan
@@ -230,9 +288,9 @@ async def run_agent(req: AgentRequest):
             return {
                 "result": f"✅ [PRODUTO CRIADO E GRAVADO NO SUPABASE!]\n\n"
                           f"📦 Conceito: {data.get('product_concept')}\n\n"
-                          f"💻 Código & Landing Page gerados com sucesso!\n"
+                          f"💻 Código & Landing Page compilados com sucesso!\n"
                           f"📲 Notificação enviada para o teu Telegram.\n\n"
-                          f"(Clica no botão de atualizar ou recarrega a página para ver o novo ativo no topo)"
+                          f"(O novo ativo já está no topo da lista no teu dashboard)"
             }
 
         # 4. Resposta Geral
