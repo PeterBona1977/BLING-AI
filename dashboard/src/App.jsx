@@ -96,7 +96,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight">BLING AI Multimedia Content Studio</h1>
-            <p className="text-xs text-slate-400">Vídeos MP4 + Voz Neural IA + Landing Pages + CRM</p>
+            <p className="text-xs text-slate-400">Software Funcional + Vídeos MP4 + Voz Neural IA + CRM</p>
           </div>
         </div>
 
@@ -125,7 +125,7 @@ export default function App() {
             }`}
         >
           <TrendingUp className="w-4 h-4" />
-          <span>Ativos & Vídeos Criados ({opportunities.length})</span>
+          <span>Ativos & Ferramentas Criadas ({opportunities.length})</span>
         </button>
 
         <button
@@ -147,13 +147,13 @@ export default function App() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
                   <TrendingUp className="w-4 h-4" />
-                  <span>Conteúdos Visuais e Áudio Produzidos</span>
+                  <span>Conteúdos Visuais, Vídeo e Áudio Produzidos</span>
                 </div>
               </div>
 
               {opportunities.length === 0 ? (
                 <div className="py-12 text-center text-slate-500 text-sm">
-                  Nenhum ativo gerado ainda. Pede no prompt abaixo ou aguarda o radar autónomo.
+                  Nenhum ativo gerado ainda. Pede no prompt ao lado para começar.
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -178,52 +178,52 @@ export default function App() {
                           </span>
                         </div>
 
-                        {/* Bloco Multimédia: Capa IA + Player de Vídeo e Áudio Seguro */}
+                        {/* Bloco Multimédia: Capa IA + Vídeo de Fundo + Player de Áudio Neural */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                          {opp.image_url && (
-                            <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex flex-col justify-between">
-                              <span className="text-[11px] font-semibold text-amber-400 flex items-center gap-1 mb-2">
-                                <ImageIcon className="w-3.5 h-3.5" /> Capa / Mockup do Produto
-                              </span>
+                          {/* Imagem de Capa gerada por IA */}
+                          <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex flex-col justify-between">
+                            <span className="text-[11px] font-semibold text-amber-400 flex items-center gap-1 mb-2">
+                              <ImageIcon className="w-3.5 h-3.5" /> Capa / Mockup do Produto (IA)
+                            </span>
+                            {opp.image_url ? (
                               <img
                                 src={opp.image_url}
                                 alt={opp.title}
                                 loading="lazy"
-                                className="w-full h-44 object-cover rounded-lg border border-slate-800 bg-slate-950"
+                                className="w-full h-40 object-cover rounded-lg border border-slate-800 bg-slate-950"
                               />
-                            </div>
-                          )}
+                            ) : (
+                              <div className="w-full h-40 flex items-center justify-center text-xs text-slate-500">Sem imagem.</div>
+                            )}
+                          </div>
 
-                          {opp.video_url && (
-                            <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex flex-col justify-between">
-                              <span className="text-[11px] font-semibold text-rose-400 flex items-center gap-1 mb-2">
-                                <Video className="w-3.5 h-3.5" /> Vídeo Fundo + Áudio Neural IA
-                              </span>
-                              {/* Vídeo de background livre de CORS */}
-                              <video
-                                src={opp.video_url}
-                                autoPlay
-                                muted
-                                loop
-                                playsInline
-                                className="w-full h-32 object-cover rounded-lg bg-black border border-slate-800 mb-2"
-                              />
-                              {/* Player de Voz gerada pela IA! */}
-                              {opp.audio_url ? (
-                                <audio src={opp.audio_url} controls className="w-full h-8" />
-                              ) : (
-                                <div className="text-xs text-slate-500 text-center py-1">Sem narração gerada.</div>
-                              )}
-                            </div>
-                          )}
+                          {/* Vídeo e Player de Voz Neural */}
+                          <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex flex-col justify-between">
+                            <span className="text-[11px] font-semibold text-rose-400 flex items-center gap-1 mb-2">
+                              <Video className="w-3.5 h-3.5" /> Vídeo TikTok + Áudio Neural
+                            </span>
+                            <video
+                              src={opp.video_url || "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"}
+                              autoPlay
+                              muted
+                              loop
+                              playsInline
+                              className="w-full h-24 object-cover rounded-lg bg-black border border-slate-800 mb-2"
+                            />
+                            {opp.audio_url ? (
+                              <audio src={opp.audio_url} controls className="w-full h-8" />
+                            ) : (
+                              <div className="text-xs text-slate-500 text-center py-1">Sem áudio gerado.</div>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Link da Landing Page Pública */}
+                        {/* Link da Aplicação Web Pública */}
                         {opp.landing_page_html && (
                           <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div className="flex items-center gap-2 text-xs font-medium text-cyan-400">
                               <Globe className="w-3.5 h-3.5" />
-                              <span>Landing Page Pública</span>
+                              <span>Aplicação Funcional Online</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <a
@@ -233,7 +233,7 @@ export default function App() {
                                 className="text-xs text-cyan-300 hover:text-cyan-100 flex items-center gap-1 bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-1 rounded transition"
                               >
                                 <ExternalLink className="w-3 h-3" />
-                                <span>Abrir URL Pública</span>
+                                <span>Testar App Real</span>
                               </a>
                               <button
                                 onClick={() => handleCopy(publicUrl, `link-${opp.id}`)}
@@ -251,7 +251,7 @@ export default function App() {
                           <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-400">
-                                <Video className="w-3.5 h-3.5" /> Guião de Narração (30s)
+                                <Video className="w-3.5 h-3.5" /> Guião de Narração (TikTok)
                               </span>
                               <button
                                 onClick={() => handleCopy(opp.video_script, `video-${opp.id}`)}
@@ -267,34 +267,6 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* Código Fonte do Produto */}
-                        {opp.code_payload && (
-                          <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg">
-                            <div className="flex items-center justify-between">
-                              <button
-                                onClick={() => setOpenCodeId(openCodeId === opp.id ? null : opp.id)}
-                                className="text-xs font-medium text-emerald-400 flex items-center gap-1.5 hover:underline"
-                              >
-                                <Code2 className="w-3.5 h-3.5" />
-                                <span>{openCodeId === opp.id ? "Ocultar Código" : "Ver Código do Produto"}</span>
-                                {openCodeId === opp.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                              </button>
-                              <button
-                                onClick={() => handleCopy(opp.code_payload, `code-${opp.id}`)}
-                                className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded transition"
-                              >
-                                {copiedId === `code-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedId === `code-${opp.id}` ? "Copiado!" : "Copiar Código"}</span>
-                              </button>
-                            </div>
-                            {openCodeId === opp.id && (
-                              <pre className="mt-2 p-3 bg-slate-950 text-emerald-300 text-[11px] font-mono rounded overflow-x-auto border border-slate-900 whitespace-pre-wrap">
-                                {opp.code_payload}
-                              </pre>
-                            )}
-                          </div>
-                        )}
-
                         {/* Post de Redes */}
                         {opp.social_post && (
                           <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
@@ -303,7 +275,7 @@ export default function App() {
                                 <Share2 className="w-3 h-3 text-cyan-400" /> Post Pronto com Link
                               </span>
                               <button
-                                onClick={() => handleCopy(`${opp.social_post}\n\n👉 Acede aqui: ${publicUrl}`, `post-${opp.id}`)}
+                                onClick={() => handleCopy(`${opp.social_post}\n\n👉 Testa a ferramenta aqui: ${publicUrl}`, `post-${opp.id}`)}
                                 className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded transition"
                               >
                                 {copiedId === `post-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
@@ -327,7 +299,7 @@ export default function App() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
                   <Users className="w-4 h-4" />
-                  <span>Leads & Inscrições Recebidas ({leads.length})</span>
+                  <span>Leads & Clientes ({leads.length})</span>
                 </div>
               </div>
 
@@ -341,7 +313,7 @@ export default function App() {
                     <div key={l.id} className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl flex items-center justify-between">
                       <div>
                         <div className="text-xs font-semibold text-emerald-400">{l.email}</div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">Interesse: {l.product_name}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Ferramenta: {l.product_name}</div>
                       </div>
                       <div className="text-[10px] text-slate-500">
                         {new Date(l.created_at).toLocaleDateString()} {new Date(l.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -359,14 +331,14 @@ export default function App() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
             <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm mb-4">
               <Bot className="w-4 h-4 text-emerald-400" />
-              <span>Criador de Mídia e Vídeo Sob Pedido</span>
+              <span>Gerador de Software & Mídia</span>
             </div>
 
             <form onSubmit={handleAskAgent} className="space-y-3">
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Ex: Cria uma ferramenta em Python para transcrever reuniões e gera o vídeo do TikTok..."
+                placeholder="Ex: Cria um micro-SaaS de calculadora de ROI..."
                 rows={4}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none"
               />
