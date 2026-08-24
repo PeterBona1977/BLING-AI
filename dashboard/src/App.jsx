@@ -17,8 +17,7 @@ import {
   Users,
   Link,
   Video,
-  Image as ImageIcon,
-  Play
+  Image as ImageIcon
 } from 'lucide-react';
 
 const BACKEND_URL = "https://web-production-803c4.up.railway.app";
@@ -47,7 +46,7 @@ export default function App() {
       if (oppsRes && oppsRes.opportunities) setOpportunities(oppsRes.opportunities);
       if (leadsRes && leadsRes.leads) setLeads(leadsRes.leads);
     } catch (e) {
-      console.error("Erro:", e);
+      console.error("Erro ao carregar dados:", e);
     } finally {
       setLoading(false);
     }
@@ -79,7 +78,7 @@ export default function App() {
         body: JSON.stringify({ prompt })
       });
       const data = await res.json();
-      setAgentResponse(data.result || "Sem resposta.");
+      setAgentResponse(data.result || "Sem resposta do servidor.");
       fetchData();
     } catch (err) {
       setAgentResponse("Erro ao contactar o agente.");
@@ -97,7 +96,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight">BLING AI Multimedia Content Studio</h1>
-            <p className="text-xs text-slate-400">Vídeos MP4 Reais + Imagens IA + Landing Pages + CRM</p>
+            <p className="text-xs text-slate-400">Vídeos MP4 + Mockups IA + Landing Pages + CRM</p>
           </div>
         </div>
 
@@ -116,7 +115,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Tabs */}
+      {/* Navegação entre Ativos e CRM */}
       <div className="max-w-6xl mx-auto mt-6 flex gap-3 border-b border-slate-800 pb-2">
         <button
           onClick={() => setActiveTab("opportunities")}
@@ -179,7 +178,7 @@ export default function App() {
                           </span>
                         </div>
 
-                        {/* Bloco Visual: Capa IA + Player de Vídeo TikTok */}
+                        {/* Bloco Multimédia: Capa IA + Player de Vídeo Seguro */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                           {opp.image_url && (
                             <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex flex-col justify-between">
@@ -189,7 +188,8 @@ export default function App() {
                               <img
                                 src={opp.image_url}
                                 alt={opp.title}
-                                className="w-full h-40 object-cover rounded-lg border border-slate-800"
+                                loading="lazy"
+                                className="w-full h-44 object-cover rounded-lg border border-slate-800 bg-slate-950"
                               />
                             </div>
                           )}
@@ -202,13 +202,16 @@ export default function App() {
                               <video
                                 src={opp.video_url}
                                 controls
-                                className="w-full h-40 object-cover rounded-lg bg-black border border-slate-800"
+                                playsInline
+                                preload="metadata"
+                                crossOrigin="anonymous"
+                                className="w-full h-44 object-cover rounded-lg bg-black border border-slate-800"
                               />
                             </div>
                           )}
                         </div>
 
-                        {/* Landing Page Link */}
+                        {/* Link da Landing Page Pública */}
                         {opp.landing_page_html && (
                           <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div className="flex items-center gap-2 text-xs font-medium text-cyan-400">
@@ -236,7 +239,7 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* Guião de Vídeo Expandido */}
+                        {/* Guião de Narração */}
                         {opp.video_script && (
                           <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
                             <div className="flex items-center justify-between">
@@ -254,6 +257,34 @@ export default function App() {
                             <p className="text-xs text-slate-300 whitespace-pre-wrap font-sans bg-slate-950 p-2.5 rounded border border-slate-900 leading-relaxed">
                               {opp.video_script}
                             </p>
+                          </div>
+                        )}
+
+                        {/* Código Fonte do Produto */}
+                        {opp.code_payload && (
+                          <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <button
+                                onClick={() => setOpenCodeId(openCodeId === opp.id ? null : opp.id)}
+                                className="text-xs font-medium text-emerald-400 flex items-center gap-1.5 hover:underline"
+                              >
+                                <Code2 className="w-3.5 h-3.5" />
+                                <span>{openCodeId === opp.id ? "Ocultar Código" : "Ver Código do Produto"}</span>
+                                {openCodeId === opp.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              </button>
+                              <button
+                                onClick={() => handleCopy(opp.code_payload, `code-${opp.id}`)}
+                                className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded transition"
+                              >
+                                {copiedId === `code-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedId === `code-${opp.id}` ? "Copiado!" : "Copiar Código"}</span>
+                              </button>
+                            </div>
+                            {openCodeId === opp.id && (
+                              <pre className="mt-2 p-3 bg-slate-950 text-emerald-300 text-[11px] font-mono rounded overflow-x-auto border border-slate-900 whitespace-pre-wrap">
+                                {opp.code_payload}
+                              </pre>
+                            )}
                           </div>
                         )}
 
@@ -316,7 +347,7 @@ export default function App() {
           )}
         </div>
 
-        {/* Painel Lateral */}
+        {/* Painel Lateral de Criação */}
         <div className="space-y-6">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
             <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm mb-4">
