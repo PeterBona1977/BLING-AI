@@ -147,7 +147,7 @@ async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manua
     code_payload = data.get("code_payload", f"# Boilerplate funcional para {topic}\nimport os\nprint('Módulo ativo')")
     social_post = data.get("social_post", f"🚀 Acabei de automatizar '{topic}'!\n\n1. Rápido\n2. Escalável\n\nQueres testar? Comenta 'EU QUERO'.")
     
-    # Landing page interativa com envio real de lead para o backend
+    # Landing page com leitura dinâmica do DOM para evitar quebra por aspas
     landing_page_html = f"""<!DOCTYPE html>
 <html lang="pt">
 <head>
@@ -163,7 +163,7 @@ async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manua
   </header>
   <main class="max-w-4xl mx-auto px-6 py-12 text-center">
     <span class="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4 inline-block">Acesso Antecipado</span>
-    <h1 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight mb-6">{title}</h1>
+    <h1 id="productTitle" class="text-3xl md:text-5xl font-extrabold text-white tracking-tight mb-6">{title}</h1>
     <p class="text-base md:text-lg text-slate-400 mb-10 max-w-2xl mx-auto">{summary}</p>
     
     <div id="cta" class="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md mx-auto shadow-2xl">
@@ -184,8 +184,12 @@ async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manua
 
   <script>
     async function sendLead() {{
-      const email = document.getElementById('leadEmail').value;
+      const emailInput = document.getElementById('leadEmail');
+      const email = emailInput ? emailInput.value : '';
+      const titleElem = document.getElementById('productTitle');
+      const productName = titleElem ? titleElem.innerText : 'Produto BLING';
       const btn = document.getElementById('submitBtn');
+
       if (!email || !email.includes('@')) {{
         alert('Por favor insere um email válido.');
         return;
@@ -196,7 +200,7 @@ async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manua
         const res = await fetch('https://web-production-803c4.up.railway.app/api/leads', {{
           method: 'POST',
           headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify({{ product_name: '{title}', email: email }})
+          body: JSON.stringify({{ product_name: productName, email: email }})
         }});
         if(res.ok) {{
           document.getElementById('formContainer').classList.add('hidden');
@@ -207,7 +211,7 @@ async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manua
           btn.innerText = 'Entrar na Lista VIP';
         }}
       }} catch(e) {{
-        alert('Erro de conexão.');
+        alert('Erro de conexão com o servidor.');
         btn.disabled = false;
         btn.innerText = 'Entrar na Lista VIP';
       }}
