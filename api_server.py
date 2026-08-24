@@ -2,7 +2,6 @@ import os
 import asyncio
 import json
 import re
-import uuid
 import urllib.parse
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
@@ -10,21 +9,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import httpx
 from groq import Groq
 from supabase import create_client, Client
 
-# Importar Edge-TTS para Voz Neural
-try:
-    import edge_tts
-    EDGE_TTS_AVAILABLE = True
-except ImportError:
-    EDGE_TTS_AVAILABLE = False
-
-# 1. Pastas e Supabase Setup
-os.makedirs("media", exist_ok=True)
+# 1. Supabase Setup
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Optional[Client] = None
@@ -35,33 +25,22 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         print(f"[Supabase Init Error]: {e}")
 
-# 2. Gerador Real de Imagem e Áudio (Voz Neural)
+# 2. Geradores Cloud (Sem necessidade de guardar ficheiros locais)
 def generate_ai_banner_image(topic: str) -> str:
     clean_prompt = f"Futuristic dark mode 3D SaaS application UI dashboard for {topic}, neon emerald lights, photorealistic, 8k render"
     encoded = urllib.parse.quote(clean_prompt)
     return f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&nologo=true&model=flux"
 
-async def generate_neural_voice(script_text: str, opp_id: str) -> str:
-    if not EDGE_TTS_AVAILABLE:
-        return ""
-    
-    # Limpar as tags do guião para a IA ler apenas o texto falado
+def generate_cloud_neural_voice(script_text: str) -> str:
+    """Usa a Cloud API do Google TTS para gerar o áudio dinamicamente (100% gratuito e sem ficheiros locais)"""
+    # Limpar as tags para ler apenas o texto
     clean_text = re.sub(r'🎬 \[.*?\]: ', '', script_text).replace("'", "").replace('"', '')
-    
-    filename = f"audio_{opp_id}.mp3"
-    filepath = os.path.join("media", filename)
-    
-    try:
-        # Voz hiper-realista em Português de Portugal (Duarte)
-        communicate = edge_tts.Communicate(clean_text, "pt-PT-DuarteNeural")
-        await communicate.save(filepath)
-        return f"https://web-production-803c4.up.railway.app/media/{filename}"
-    except Exception as e:
-        print(f"[TTS Error]: {e}")
-        return ""
+    # Limite de segurança de caracteres para a API gratuita
+    encoded_text = urllib.parse.quote(clean_text[:200])
+    return f"https://translate.google.com/translate_tts?ie=UTF-8&tl=pt-PT&client=tw-ob&q={encoded_text}"
 
-# Vídeo MP4 vertical 100% livre de bloqueios CORS (Pexels Tech Background)
-FALLBACK_VIDEO_URL = "https://videos.pexels.com/video-files/5198159/5198159-uhd_1080_1920_25fps.mp4"
+# Vídeo de background da Google Cloud Storage (Livre de bloqueios CORS)
+FALLBACK_VIDEO_URL = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
 
 # 3. Despacho no Telegram
 async def send_telegram_alert(message_text: str):
@@ -76,7 +55,7 @@ async def send_telegram_alert(message_text: str):
     except Exception:
         pass
 
-# 4. Gravação de Dados
+# 4. Operações de BD
 def opportunity_exists(title: str) -> bool:
     if not supabase: return False
     try:
@@ -108,21 +87,19 @@ def save_opportunity_to_supabase(
         return None
 
 # 5. Motor de Criação
-async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Motor Autónomo"):
-    print(f"\n[BLING Engine]: A produzir conteúdo para: '{topic[:40]}'...")
-    
+async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Ordem Manual"):
     prompt = f"""
     Cria um plano de produto digital e campanha viral completa para: '{topic}'.
     Responde em JSON estrito com estas chaves:
     {{
         "title": "{topic}",
         "score": 10,
-        "summary": "Resumo de 1 frase do problema e da solução automatizada.",
-        "action_plan": "Estratégia de monetização direta.",
-        "product_concept": "Descrição técnica da ferramenta.",
+        "summary": "Resumo de 1 frase.",
+        "action_plan": "Estratégia de monetização.",
+        "product_concept": "Descrição técnica.",
         "code_payload": "# Código funcional\\nprint('Pronto!')",
-        "social_post": "Post persuasivo para LinkedIn e X com gancho e CTA.",
-        "video_script": "🎬 [0-3s Gancho]: 'Pára tudo se fazes {topic} à mão!'\\n🎬 [3-20s Solução]: 'Criámos uma automação que faz isto por ti.'\\n🎬 [20-30s CTA]: 'Link na bio para acesso VIP!'",
+        "social_post": "Post para redes.",
+        "video_script": "🎬 [0-3s Gancho]: 'Chega de perder tempo com {topic}!'\\n🎬 [3-20s Solução]: 'Usa esta automação.'\\n🎬 [20-30s CTA]: 'Link na bio!'",
         "cold_email": "Assunto: Automação para {topic}\\n\\nOlá..."
     }}
     """
@@ -147,22 +124,17 @@ async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Moto
                 data = json.loads(json_match.group(0))
 
         title = data.get("title", topic)
-        summary = data.get("summary", f"Solução automatizada para: {topic}")
+        summary = data.get("summary", f"Solução para: {topic}")
         product_concept = data.get("product_concept", f"Micro-ferramenta {topic}")
         social_post = data.get("social_post", f"🚀 Acabei de automatizar '{topic}'!")
         video_script = data.get("video_script", f"🎬 [0-3s Gancho]: Pára tudo sobre {topic}!\n🎬 [3-20s Solução]: Sistema pronto.\n🎬 [20-30s CTA]: Link na bio!")
         
-        # 1. Gerar Imagem Capa
+        # Gera o link da Imagem e do Áudio TTS diretamente
         image_url = generate_ai_banner_image(title)
+        audio_url = generate_cloud_neural_voice(video_script)
         
-        # 2. Gerar ID Temporário para o Áudio
-        temp_id = str(uuid.uuid4())[:8]
-        
-        # 3. Gerar Voz Neural (.mp3)
-        audio_url = await generate_neural_voice(video_script, temp_id)
-        
-        # 4. Landing Page
-        landing_page_html = f"""<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script><title>{title}</title></head><body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col items-center justify-center p-6"><h1 class="text-4xl font-bold text-emerald-400 mb-4">{title}</h1><p class="text-slate-400 max-w-xl text-center mb-8">{summary}</p><div class="bg-slate-900 p-8 rounded-2xl border border-slate-800 shadow-2xl"><h3 class="text-lg font-bold mb-4">Acesso Antecipado</h3><input type="email" placeholder="O teu email..." class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-white mb-4"><button class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl transition" onclick="alert('Inscrição confirmada!')">Garantir Vaga</button></div></body></html>"""
+        # HTML Básico da Landing Page
+        landing_page_html = f"""<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script><title>{title}</title></head><body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-6"><h1 class="text-4xl font-bold text-emerald-400 mb-4">{title}</h1><p class="text-slate-400 mb-8">{summary}</p><div class="bg-slate-900 p-8 rounded-2xl w-full max-w-md"><input type="email" placeholder="O teu email..." class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-white mb-4"><button class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl" onclick="alert('Inscrição confirmada!')">Garantir Vaga</button></div></body></html>"""
 
         opp_id = save_opportunity_to_supabase(
             source=source, title=title, score=10, summary=summary,
@@ -178,16 +150,13 @@ async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Moto
         print(f"[Pipeline Error]: {e}")
         return None
 
-# 6. FastAPI App
+# 6. Aplicação Web
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="BLING AI Media Studio", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
-
-# Servir a pasta de áudios criados pela IA
-app.mount("/media", StaticFiles(directory="media"), name="media")
 
 class AgentRequest(BaseModel):
     prompt: str
@@ -210,7 +179,7 @@ async def run_agent(req: AgentRequest):
         client = Groq(api_key=groq_key)
         await build_product_asset_pipeline(client, req.prompt, source="Ordem Manual")
         return {
-            "result": f"✅ [SUCESSO!]\n\nGerámos a Capa de IA e gravámos a **Narração de Voz Neural (Text-to-Speech)**!\nOuve o áudio resultante no player do teu Dashboard."
+            "result": f"✅ [SUCESSO!]\n\nGerámos a Capa de IA e a Locução em Português via Cloud TTS!\nOuve o áudio e vê o vídeo no teu Dashboard."
         }
     except Exception as e:
         return {"result": f"Erro interno: {str(e)}"}
