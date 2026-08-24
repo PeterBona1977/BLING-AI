@@ -58,14 +58,16 @@ async def send_telegram_alert(message_text: str):
     except Exception:
         pass
 
-# 4. Gravação na Base de Dados
+# 4. Gravação rigorosa com tratamento de erros visíveis
 def save_opportunity_to_supabase(
     source: str, title: str, score: int, summary: str, action_plan: str, 
     social_post: str = "", product_concept: str = "", code_payload: str = "", 
     landing_page_html: str = "", video_script: str = "", video_url: str = "", 
     image_url: str = "", audio_url: str = "", cold_email: str = ""
 ):
-    if not supabase: return None
+    if not supabase: 
+        raise Exception("Supabase não configurado no servidor (verificar variáveis SUPABASE_URL e SUPABASE_KEY no Railway).")
+    
     try:
         res = supabase.table("opportunities").insert({
             "source": source, "title": title, "score": score, "summary": summary,
@@ -75,17 +77,18 @@ def save_opportunity_to_supabase(
             "video_url": video_url, "image_url": image_url, "audio_url": audio_url,
             "cold_email": cold_email, "status": "pending_approval"
         }).execute()
+        
         if res.data and len(res.data) > 0:
             return res.data[0].get("id")
-        return None
+        raise Exception(f"Falha ao inserir registo na tabela opportunities: {res}")
     except Exception as e:
-        print(f"[DB Error]: {e}")
-        return None
+        print(f"[DB Error Detailed]: {e}")
+        raise Exception(f"Erro Supabase: {str(e)}")
 
-# 5. MOTOR COM MODELO POTENTE (Llama 3.3 70B)
+# 5. MOTOR COM LAMA 3.3
 async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Ordem Manual"):
     prompt = f"""
-    És um Arquiteto de Software de Elite e Diretor de Marketing Viral.
+    És um Arquiteto de Software e Diretor de Marketing Viral.
     O utilizador pediu: '{topic}'.
     
     Gera um projeto completo e original. Responde estritamente em JSON com esta estrutura exata:
@@ -99,45 +102,41 @@ async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Orde
     }}
     """
     
-    try:
-        # Usamos o modelo de topo da Groq com suporte a JSON mode estrito
-        completion = ai.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": "És um programador senior e copywriter de conversão. Deves responder estritamente num objeto JSON válido."},
-                {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.4
-        )
-        
-        raw_content = completion.choices[0].message.content
-        data = json.loads(raw_content)
+    completion = ai.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": "És um programador senior e copywriter de conversão. Deves responder estritamente num objeto JSON válido."},
+            {"role": "user", "content": prompt}
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.4
+    )
+    
+    raw_content = completion.choices[0].message.content
+    data = json.loads(raw_content)
 
-        title = data.get("title", "SaaSPro")
-        summary = data.get("summary", "Ferramenta otimizada.")
-        product_concept = data.get("product_concept", "Aplicação Web SPA.")
-        social_post = data.get("social_post", f"🚀 Lançamento oficial do {title}!")
-        video_script = data.get("video_script", "🎬 [0-3s Gancho]: Vê isto!\n🎬 [3-20s Solução]: Revolucionário.\n🎬 [20-30s CTA]: Experimenta grátis!")
-        functional_html = data.get("functional_html", "<h1>Erro ao gerar UI</h1>")
-        
-        image_url = generate_ai_banner_image(title)
-        audio_url = generate_cloud_neural_voice(video_script)
-        video_url = FALLBACK_VIDEO_URL
-        
-        opp_id = save_opportunity_to_supabase(
-            source=source, title=title, score=10, summary=summary,
-            action_plan="Monetização Direta", social_post=social_post,
-            product_concept=product_concept, code_payload="Lógica JS nativa",
-            landing_page_html=functional_html, video_script=video_script,
-            video_url=video_url, image_url=image_url, audio_url=audio_url,
-            cold_email="N/A"
-        )
-        
-        return data
-    except Exception as e:
-        print(f"[Pipeline Error]: {e}")
-        return None
+    title = data.get("title", "SaaSPro")
+    summary = data.get("summary", "Ferramenta otimizada.")
+    product_concept = data.get("product_concept", "Aplicação Web SPA.")
+    social_post = data.get("social_post", f"🚀 Lançamento oficial do {title}!")
+    video_script = data.get("video_script", "🎬 [0-3s Gancho]: Vê isto!\n🎬 [3-20s Solução]: Revolucionário.\n🎬 [20-30s CTA]: Experimenta grátis!")
+    functional_html = data.get("functional_html", "<h1>Erro ao gerar UI</h1>")
+    
+    image_url = generate_ai_banner_image(title)
+    audio_url = generate_cloud_neural_voice(video_script)
+    video_url = FALLBACK_VIDEO_URL
+    
+    # Esta linha agora lança erro visível se falhar
+    opp_id = save_opportunity_to_supabase(
+        source=source, title=title, score=10, summary=summary,
+        action_plan="Monetização Direta", social_post=social_post,
+        product_concept=product_concept, code_payload="Lógica JS nativa",
+        landing_page_html=functional_html, video_script=video_script,
+        video_url=video_url, image_url=image_url, audio_url=audio_url,
+        cold_email="N/A"
+    )
+    
+    return data
 
 # 6. Aplicação Web
 @asynccontextmanager
@@ -163,7 +162,8 @@ def list_opportunities():
     try:
         res = supabase.table("opportunities").select("*").order("created_at", desc=True).limit(30).execute()
         return {"opportunities": res.data}
-    except Exception:
+    except Exception as e:
+        print(f"[Read Error]: {e}")
         return {"opportunities": []}
 
 @app.get("/api/leads")
@@ -218,9 +218,10 @@ async def run_agent(req: AgentRequest):
         
         client = Groq(api_key=groq_key)
         await build_product_asset_pipeline(client, req.prompt, source="Ordem Manual")
-        return {"result": f"✅ [SOFTWARE DE ELITE GERADO!]\n\nO motor Llama 3.3 construiu um produto real, guião completo e áudio alargado."}
+        return {"result": f"✅ [SOFTWARE DE ELITE GERADO E GUARDADO NA BD!]\n\nProduto criado e gravado com sucesso."}
     except Exception as e:
-        return {"result": f"Erro interno: {str(e)}"}
+        # Agora o erro real aparece diretamente na caixa de resposta do teu dashboard!
+        return {"result": f"❌ ERRO NO MOTOR: {str(e)}"}
 
 @app.get("/p/{opp_id}", response_class=HTMLResponse)
 def serve_landing_page(opp_id: int):
