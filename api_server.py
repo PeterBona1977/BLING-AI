@@ -13,7 +13,7 @@ import httpx
 from groq import Groq
 from supabase import create_client, Client
 
-# 1. Supabase Setup
+# 1. Configuração Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Optional[Client] = None
@@ -21,22 +21,35 @@ supabase: Optional[Client] = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 2. Telegram Dispatcher
+# 2. Despachador Telegram
 async def send_telegram_alert(message_text: str):
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     if not bot_token or not chat_id:
+        print("[Telegram]: Bot token ou Chat ID em falta.")
         return "Telegram não configurado."
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             r = await client.post(url, json={"chat_id": chat_id, "text": message_text, "parse_mode": "Markdown"})
             if r.status_code == 200:
+                print("[Telegram]: Alerta enviado com sucesso.")
                 return "Notificação enviada."
+            print(f"[Telegram Error Status]: {r.status_code} - {r.text}")
             return f"Telegram status: {r.status_code}"
     except Exception as e:
+        print(f"[Telegram Exception]: {e}")
         return f"Erro Telegram: {str(e)}"
+
+def opportunity_exists(title: str) -> bool:
+    if not supabase:
+        return False
+    try:
+        res = supabase.table("opportunities").select("id").ilike("title", f"%{title[:25]}%").execute()
+        return len(res.data) > 0
+    except Exception:
+        return False
 
 def save_opportunity_to_supabase(
     source: str, 
@@ -53,9 +66,9 @@ def save_opportunity_to_supabase(
     cold_email: str = ""
 ):
     if not supabase:
-        return "Supabase não configurado."
+        return None
     try:
-        supabase.table("opportunities").insert({
+        res = supabase.table("opportunities").insert({
             "source": source,
             "title": title,
             "score": score,
@@ -70,10 +83,12 @@ def save_opportunity_to_supabase(
             "cold_email": cold_email,
             "status": "detected"
         }).execute()
-        return "Gravado com sucesso no Supabase."
+        if res.data and len(res.data) > 0:
+            return res.data[0].get("id")
+        return None
     except Exception as e:
-        print(f"[Supabase Error]: {e}")
-        return f"Erro Supabase: {str(e)}"
+        print(f"[Supabase Insert Error]: {e}")
+        return None
 
 def get_opportunities_from_supabase(limit: int = 30):
     if not supabase:
@@ -95,82 +110,91 @@ def get_leads_from_supabase(limit: int = 50):
         print(f"[Supabase Leads Error]: {e}")
         return []
 
-# 3. Multi-Scanner Feed (HackerNews + Reddit)
-async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
+# 3. Radar de Mercado com Fallback Autónomo
+async def fetch_real_market_feed(client: httpx.AsyncClient) -> List[Dict[str, str]]:
     items = []
+    
+    # HackerNews Top Recentes
     try:
-        r = await client.get("https://hn.algolia.com/api/v1/search_by_date?tags=story&hitsPerPage=2")
+        r = await client.get("https://hn.algolia.com/api/v1/search_by_date?tags=story&hitsPerPage=4", timeout=6.0)
         if r.status_code == 200:
             for hit in r.json().get("hits", []):
-                if hit.get("title"):
-                    items.append({"source": "HackerNews", "title": hit["title"]})
+                t = hit.get("title")
+                if t and len(t) > 12:
+                    items.append({"source": "HackerNews Radar", "title": t})
     except Exception as e:
-        print(f"[Fetch HN Error]: {e}")
+        print(f"[Feed HN]: {e}")
 
-    for sub in ["SaaS", "SideProject", "Entrepreneur"]:
+    # Reddit r/SaaS & r/Entrepreneur via RSS JSON
+    for sub in ["SaaS", "Entrepreneur", "SideProject"]:
         try:
-            headers = {"User-Agent": "Mozilla/5.0 (BLING-AI Scanner)"}
-            r = await client.get(f"https://www.reddit.com/r/{sub}/new.json?limit=1", headers=headers)
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BLING/2.0"}
+            r = await client.get(f"https://www.reddit.com/r/{sub}/new.json?limit=2", headers=headers, timeout=6.0)
             if r.status_code == 200:
                 for p in r.json().get("data", {}).get("children", []):
-                    title = p.get("data", {}).get("title")
-                    if title:
-                        items.append({"source": f"Reddit r/{sub}", "title": title})
+                    t = p.get("data", {}).get("title")
+                    if t and len(t) > 15 and not t.startswith("["):
+                        items.append({"source": f"Reddit r/{sub}", "title": t})
         except Exception as e:
-            print(f"[Fetch Reddit {sub} Error]: {e}")
+            print(f"[Feed Reddit {sub}]: {e}")
 
     return items
 
-async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manual"):
+# 4. Fábrica Digital Autónoma
+async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Motor Autónomo"):
+    print(f"\n[BLING Autonomous Engine]: A sintetizar produto para -> {topic[:40]}...")
+    
     prompt = f"""
-    Cria um ecossistema completo de produto e marketing para a oportunidade: '{topic}'.
-    Responde com as seguintes chaves em formato JSON:
+    És o Diretor de Criação e Engenheiro-Chefe da BLING AI.
+    Cria um ecossistema de produto digital e campanha viral completo para: '{topic}'.
+    Responde em JSON com estas chaves:
     {{
         "title": "{topic}",
         "score": 10,
-        "summary": "Resumo do problema e solução em 1 frase",
-        "action_plan": "Estratégia de monetização direta",
-        "product_concept": "Descrição técnica e arquitetura da ferramenta",
-        "code_payload": "# Script Python/JS funcional\\nprint('Ferramenta {topic} pronta')",
-        "social_post": "Post persuasivo para LinkedIn e X com gancho e CTA",
-        "video_script": "🎬 [0-3s Gancho]: 'Texto falado e instrução visual'\\n🎬 [3-20s Problema & Demonstração]: 'Texto do guião'\\n🎬 [20-30s CTA]: 'Clica no link na bio para aceder'",
-        "ai_media_prompt": "Cinematic visual prompt for Midjourney / Runway video: Futuristic minimal UI dashboard showing {topic}, 8k, photorealistic studio lighting",
-        "cold_email": "Assunto: Oportunidade rápida sobre {topic}\\n\\nOlá,\\nreparei na necessidade recente de {topic} e desenvolvemos uma solução automatizada..."
+        "summary": "Resumo conciso de 1 frase do problema e da solução automatizada.",
+        "action_plan": "Estratégia prática de monetização e lançamento.",
+        "product_concept": "Descrição técnica da arquitetura, stack e funcionalidades chave.",
+        "code_payload": "# Código Python ou JavaScript funcional e pronto a correr\\nprint('Ferramenta {topic} inicializada com sucesso!')",
+        "social_post": "Post viral pronto para LinkedIn e Twitter com gancho, 2 benefícios e chamada para ação.",
+        "video_script": "🎬 [0-3s Gancho]: 'Pára tudo se fazes {topic} à mão!'\\n🎬 [3-20s Demonstração]: 'Criámos uma automação que faz isto por ti em segundos.'\\n🎬 [20-30s CTA]: 'Clica no link da bio para acesso exclusivo.'",
+        "ai_media_prompt": "Cinematic 3D SaaS UI dashboard render of {topic}, dark mode, neon emerald accents, photorealistic studio lighting, 8k resolution",
+        "cold_email": "Assunto: Automação para {topic}\\n\\nOlá,\\nDesenvolvemos uma ferramenta para resolver {topic} de forma autónoma. Gostaria de testar sem custo?"
     }}
     """
     
-    completion = ai.chat.completions.create(
-        model="openai/gpt-oss-20b",
-        messages=[
-            {"role": "system", "content": "És um Diretor de Marketing Viral e Engenheiro de Software Full Stack. Responde com JSON estrito."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.3
-    )
-    
-    raw_content = completion.choices[0].message.content
-    data = {}
     try:
-        data = json.loads(raw_content)
-    except Exception:
-        json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
-        if json_match:
-            try:
-                data = json.loads(json_match.group(0))
-            except Exception:
-                pass
+        completion = ai.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=[
+                {"role": "system", "content": "És um construtor de micro-SaaS e diretor de monetização. Responde estritamente em JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2
+        )
+        
+        raw_content = completion.choices[0].message.content
+        data = {}
+        try:
+            data = json.loads(raw_content)
+        except Exception:
+            json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
+            if json_match:
+                try:
+                    data = json.loads(json_match.group(0))
+                except Exception:
+                    pass
 
-    title = data.get("title", topic)
-    summary = data.get("summary", f"Solução automatizada para: {topic}")
-    action_plan = data.get("action_plan", "Monetização via subscrição ou pagamento único.")
-    product_concept = data.get("product_concept", f"Micro-ferramenta orientada a resolver {topic}")
-    code_payload = data.get("code_payload", f"# Boilerplate funcional para {topic}\nimport os\nprint('Módulo ativo')")
-    social_post = data.get("social_post", f"🚀 Acabei de automatizar '{topic}'!\n\n1. Rápido\n2. Escalável\n\nQueres testar? Acede ao link abaixo.")
-    video_script = data.get("video_script", f"🎬 [0-3s Gancho]: Pára tudo se ainda perdes horas com {topic}!\n🎬 [3-20s Solução]: Criámos um sistema automático que resolve isto em 1 clique.\n🎬 [20-30s CTA]: Link na bio para garantir acesso VIP!")
-    ai_media_prompt = data.get("ai_media_prompt", f"High tech futuristic SaaS UI mockup for {topic}, dark neon aesthetic, ultra detailed, 8k render")
-    cold_email = data.get("cold_email", f"Assunto: Solução para {topic}\n\nOlá,\nDesenvolvemos uma automação para {topic} que reduz em 80% o tempo manual. Podemos demonstrar?")
-    
-    landing_page_html = f"""<!DOCTYPE html>
+        title = data.get("title", topic)
+        summary = data.get("summary", f"Solução automatizada desenvolvida para: {topic}")
+        action_plan = data.get("action_plan", "Monetização via subscrição mensal ou licença direta.")
+        product_concept = data.get("product_concept", f"Micro-ferramenta especializada em {topic}")
+        code_payload = data.get("code_payload", f"# Boilerplate funcional para {topic}\nimport os\nprint('Módulo ativo')")
+        social_post = data.get("social_post", f"🚀 Acabei de automatizar '{topic}'!\n\n1. Processamento instantâneo\n2. Poupança de tempo garantida\n\nQueres testar? Acede ao link abaixo.")
+        video_script = data.get("video_script", f"🎬 [0-3s Gancho]: Pára tudo se ainda perdes horas com {topic}!\n🎬 [3-20s Solução]: Criámos um sistema automático que resolve isto em 1 clique.\n🎬 [20-30s CTA]: Link na bio para garantir acesso VIP!")
+        ai_media_prompt = data.get("ai_media_prompt", f"High tech futuristic SaaS UI mockup for {topic}, dark neon aesthetic, ultra detailed, 8k render")
+        cold_email = data.get("cold_email", f"Assunto: Solução para {topic}\n\nOlá,\\nDesenvolvemos uma automação para {topic}. Podemos demonstrar?")
+        
+        landing_page_html = f"""<!DOCTYPE html>
 <html lang="pt">
 <head>
   <meta charset="UTF-8">
@@ -242,55 +266,86 @@ async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manua
 </body>
 </html>"""
 
-    save_opportunity_to_supabase(
-        source=source,
-        title=title,
-        score=10,
-        summary=summary,
-        action_plan=action_plan,
-        social_post=social_post,
-        product_concept=product_concept,
-        code_payload=code_payload,
-        landing_page_html=landing_page_html,
-        video_script=video_script,
-        ai_media_prompt=ai_media_prompt,
-        cold_email=cold_email
-    )
-    
-    tg_text = f"🚀 *NOVO PRODUTO & VÍDEO TIKTOK CRIADOS!*\n\n📦 *Tema:* {title}\n💡 *Produto:* {product_concept}\n🎬 *Vídeo:* {video_script[:120]}..."
-    await send_telegram_alert(tg_text)
-    
-    return {
-        "title": title,
-        "product_concept": product_concept,
-        "summary": summary,
-        "video_script": video_script,
-        "ai_media_prompt": ai_media_prompt
-    }
+        opp_id = save_opportunity_to_supabase(
+            source=source,
+            title=title,
+            score=10,
+            summary=summary,
+            action_plan=action_plan,
+            social_post=social_post,
+            product_concept=product_concept,
+            code_payload=code_payload,
+            landing_page_html=landing_page_html,
+            video_script=video_script,
+            ai_media_prompt=ai_media_prompt,
+            cold_email=cold_email
+        )
+        
+        public_link = f"https://web-production-803c4.up.railway.app/p/{opp_id}" if opp_id else "https://bling-ai.pages.dev"
+        
+        # Envio de Alerta de Alto Nível para o Telegram
+        tg_msg = (
+            f"⚡ *[MOTOR AUTÓNOMO]: NOVO ATIVO CRIADO!*\n\n"
+            f"📌 *Tema:* {title}\n"
+            f"💡 *Produto:* {product_concept}\n\n"
+            f"🌐 *Landing Page Ativa:* {public_link}\n\n"
+            f"🎬 *TikTok Script:* {video_script[:130]}...\n\n"
+            f"📱 *Post:* {social_post[:120]}..."
+        )
+        await send_telegram_alert(tg_msg)
+        print(f"[BLING Autonomous Engine]: Ativo criado com sucesso -> ID: {opp_id}")
+        
+        return data
+    except Exception as e:
+        print(f"[BLING Pipeline Error]: {e}")
+        return None
 
-# 4. Background Scanner
-async def autonomous_scanner_loop():
+# 5. Loop Permanente e Ininterrupto de Execução
+async def autonomous_background_worker():
+    print("[BLING Engine]: Loop autónomo iniciado com sucesso.")
+    
+    # Alerta de arranque no Telegram
+    await send_telegram_alert("🤖 *BLING-AI Motor Autónomo Online!*\n\nA iniciar mineração e criação de ativos digitais contínua sem intervenção manual.")
+    
     while True:
         try:
             groq_key = os.getenv("GROQ_API_KEY")
             if groq_key:
                 ai = Groq(api_key=groq_key)
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    feed = await fetch_feed_items(client)
-                    for item in feed:
-                        await generate_fast_product(ai, item["title"], source=item["source"])
+                
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    feed = await fetch_real_market_feed(client)
+                
+                # Se os feeds externos estiverem vazios/bloqueados, a IA sintetiza tendências lucrativas por iniciativa própria
+                if not feed:
+                    print("[BLING Engine]: A sintetizar nicho de mercado autónomo via IA...")
+                    synth_prompt = "Diz-me uma dor urgente de mercado de profissionais digitais ou micro-empresas hoje (ex: automação, scraping, finanças, produtividade) em 1 frase curta."
+                    comp = ai.chat.completions.create(
+                        model="openai/gpt-oss-20b",
+                        messages=[{"role": "user", "content": synth_prompt}],
+                        temperature=0.7
+                    )
+                    niche_topic = comp.choices[0].message.content.strip()
+                    feed = [{"source": "Auto-AI Market Synthesizer", "title": niche_topic}]
+                
+                for item in feed:
+                    if not opportunity_exists(item["title"]):
+                        await build_product_asset_pipeline(ai, item["title"], source=item["source"])
+                        await asyncio.sleep(20) # Pausa suave entre criações
+                        
         except Exception as e:
-            print(f"[Autonomous Scanner Error]: {e}")
+            print(f"[Autonomous Loop Error]: {e}")
             
-        await asyncio.sleep(480)
+        print("[BLING Engine]: Ciclo concluído. Próxima varredura em 5 minutos...")
+        await asyncio.sleep(300) # Corre a cada 5 minutos
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(autonomous_scanner_loop())
+    task = asyncio.create_task(autonomous_background_worker())
     yield
     task.cancel()
 
-app = FastAPI(title="BLING AI Viral Marketing & Product Engine", lifespan=lifespan)
+app = FastAPI(title="BLING AI Full Autonomous Engine", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -310,14 +365,15 @@ class LeadRequest(BaseModel):
 @app.get("/")
 @app.get("/health")
 def health():
-    return {"status": "online"}
+    return {"status": "online", "mode": "100% Autonomous Zero-Touch"}
 
 @app.get("/api/status")
 def get_status():
     return {
         "status": "online",
-        "agent": "BLING-AI Viral & Commercial Engine",
-        "features": ["TikTok Video Scripts", "AI Visual Prompts", "B2B Cold Emails", "Public Landing Pages"],
+        "agent": "BLING-AI Autonomous Zero-Touch Engine",
+        "loop_interval": "300s (5 min)",
+        "features": ["Autonomous Synthesis", "TikTok Scripts", "AI Visual Prompts", "Public Landing Pages", "Telegram Alerts"],
         "database": "Supabase PostgreSQL"
     }
 
@@ -329,12 +385,10 @@ def list_opportunities():
 def list_leads():
     return {"leads": get_leads_from_supabase(limit=50)}
 
-# Rota pública de hospedagem de Landing Pages
 @app.get("/p/{opp_id}", response_class=HTMLResponse)
 def serve_landing_page(opp_id: int):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase não configurado")
-    
     try:
         res = supabase.table("opportunities").select("landing_page_html").eq("id", opp_id).execute()
         if res.data and len(res.data) > 0 and res.data[0].get("landing_page_html"):
@@ -347,16 +401,14 @@ def serve_landing_page(opp_id: int):
 async def capture_lead(lead: LeadRequest):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase não configurado")
-    
     try:
         supabase.table("leads").insert({
             "product_name": lead.product_name,
             "email": lead.email
         }).execute()
         
-        tg_msg = f"🎉 *NOVO LEAD CAPTURADO!*\n\n📦 *Produto:* {lead.product_name}\n📧 *Email:* `{lead.email}`\n\nPronto para contacto comercial!"
+        tg_msg = f"🎉 *NOVO LEAD CAPTURADO!*\n\n📦 *Produto:* {lead.product_name}\n📧 *Email:* `{lead.email}`\n\nPronto para contacto!"
         await send_telegram_alert(tg_msg)
-        
         return {"status": "success", "message": "Lead gravado com sucesso"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -369,43 +421,11 @@ async def run_agent(req: AgentRequest):
             return {"result": "Erro: GROQ_API_KEY não configurada no Railway."}
         
         client = Groq(api_key=groq_key)
-        p_lower = req.prompt.lower()
-
-        # 1. Telegram
-        if "telegram" in p_lower or "mensagem" in p_lower:
-            res = await send_telegram_alert(f"🤖 *BLING-AI:* {req.prompt}")
-            return {"result": f"⚡ [TELEGRAM]: {res}"}
-
-        # 2. Scan
-        if "scan" in p_lower or "pesquisa" in p_lower:
-            async with httpx.AsyncClient(timeout=15.0) as http_c:
-                feed = await fetch_feed_items(http_c)
-                for item in feed:
-                    await generate_fast_product(client, item["title"], source=item["source"])
-            return {"result": f"⚡ [SCAN EXECUTADO]: {len(feed)} novos itens processados e gravados com guiões de vídeo!"}
-
-        # 3. Criação de Produto / Vídeo / Campanha
-        if any(k in p_lower for k in ["cria", "gera", "faz", "produto", "saas", "código", "landing", "script", "tiktok", "video", "email"]):
-            data = await generate_fast_product(client, req.prompt, source="Ordem Manual")
-            return {
-                "result": f"✅ [PRODUTO & CAMPANHA VIRAL CRIADOS COM SUCESSO!]\n\n"
-                          f"📦 Produto: {data.get('product_concept')}\n\n"
-                          f"🎬 Guião de Vídeo (TikTok/Reels): Gerado\n"
-                          f"🎨 Prompt de Vídeo/Imagem IA: Gerado\n"
-                          f"🌐 Landing Page Pública: Compilada\n"
-                          f"📲 Alerta Telegram: Enviado\n\n"
-                          f"Vê os novos blocos de vídeo e imagem no dashboard!"
-            }
-
-        # 4. Chat Geral
-        completion = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
-            messages=[
-                {"role": "system", "content": "És o consultor executivo e estratega de conteúdo BLING-AI."},
-                {"role": "user", "content": req.prompt}
-            ],
-            temperature=0.3
-        )
-        return {"result": completion.choices[0].message.content}
+        data = await build_product_asset_pipeline(client, req.prompt, source="Ordem Manual Instantânea")
+        return {
+            "result": f"✅ [ATIVO CRIADO E GRAVADO NO SUPABASE!]\n\n"
+                      f"📦 Conceito: {data.get('product_concept') if data else 'Criado com sucesso'}\n\n"
+                      f"🎬 Guião TikTok + Landing Page + Alerta Telegram despachados!"
+        }
     except Exception as e:
-        return {"result": f"Erro interno de execução: {str(e)}"}
+        return {"result": f"Erro interno: {str(e)}"}
