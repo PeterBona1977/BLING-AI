@@ -1,6 +1,8 @@
 fastapi
 uvicorn
 httpx
-groq
 pydantic
+groq
 supabase
+python-multipart
+edge-tts

@@ -96,7 +96,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight">BLING AI Multimedia Content Studio</h1>
-            <p className="text-xs text-slate-400">Vídeos MP4 + Mockups IA + Landing Pages + CRM</p>
+            <p className="text-xs text-slate-400">Vídeos MP4 + Voz Neural IA + Landing Pages + CRM</p>
           </div>
         </div>
 
@@ -147,7 +147,7 @@ export default function App() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
                   <TrendingUp className="w-4 h-4" />
-                  <span>Conteúdos Visuais e Vídeos Produzidos</span>
+                  <span>Conteúdos Visuais e Áudio Produzidos</span>
                 </div>
               </div>
 
@@ -178,7 +178,7 @@ export default function App() {
                           </span>
                         </div>
 
-                        {/* Bloco Multimédia: Capa IA + Player de Vídeo Seguro */}
+                        {/* Bloco Multimédia: Capa IA + Player de Vídeo e Áudio Seguro */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                           {opp.image_url && (
                             <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex flex-col justify-between">
@@ -197,16 +197,23 @@ export default function App() {
                           {opp.video_url && (
                             <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex flex-col justify-between">
                               <span className="text-[11px] font-semibold text-rose-400 flex items-center gap-1 mb-2">
-                                <Video className="w-3.5 h-3.5" /> Vídeo TikTok / Reels (MP4)
+                                <Video className="w-3.5 h-3.5" /> Vídeo Fundo + Áudio Neural IA
                               </span>
+                              {/* Vídeo de background livre de CORS */}
                               <video
                                 src={opp.video_url}
-                                controls
+                                autoPlay
+                                muted
+                                loop
                                 playsInline
-                                preload="metadata"
-                                crossOrigin="anonymous"
-                                className="w-full h-44 object-cover rounded-lg bg-black border border-slate-800"
+                                className="w-full h-32 object-cover rounded-lg bg-black border border-slate-800 mb-2"
                               />
+                              {/* Player de Voz gerada pela IA! */}
+                              {opp.audio_url ? (
+                                <audio src={opp.audio_url} controls className="w-full h-8" />
+                              ) : (
+                                <div className="text-xs text-slate-500 text-center py-1">Sem narração gerada.</div>
+                              )}
                             </div>
                           )}
                         </div>
