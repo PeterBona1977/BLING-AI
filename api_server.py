@@ -31,7 +31,7 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         print(f"[Supabase Init Error]: {e}")
 
-# 2. Geradores Cloud Seguros
+# 2. Geradores Cloud
 def generate_ai_banner_image(topic: str) -> str:
     clean_prompt = f"Futuristic dark mode 3D SaaS application UI dashboard for {topic}, neon emerald lights, photorealistic, 8k render"
     encoded = urllib.parse.quote(clean_prompt)
@@ -57,7 +57,7 @@ async def send_telegram_alert(message_text: str):
     except Exception:
         pass
 
-# 4. BD
+# 4. Gravação na Base de Dados
 def save_opportunity_to_supabase(
     source: str, title: str, score: int, summary: str, action_plan: str, 
     social_post: str = "", product_concept: str = "", code_payload: str = "", 
@@ -81,22 +81,25 @@ def save_opportunity_to_supabase(
         print(f"[DB Error]: {e}")
         return None
 
-# 5. Motor de Criação (CORRIGIDO)
+# 5. O NOVO MOTOR: ENGENHEIRO DE SOFTWARE FUNCIONAL
 async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Ordem Manual"):
-    # A ORDEM FOI CORRIGIDA AQUI: Pedimos um "nome curto de marca" para o título.
+    # A IA agora é forçada a escrever JavaScript REAL que resolve o problema do utilizador
     prompt = f"""
-    Cria um plano de produto digital e campanha viral completa para: '{topic}'.
+    És um Engenheiro de Software Full-Stack e Diretor de Produto.
+    O utilizador pediu uma ferramenta baseada nesta ideia: '{topic}'.
+    
+    A TUA TAREFA É CRIAR UMA APLICAÇÃO WEB FUNCIONAL (Micro-SaaS) e não apenas uma landing page.
+    A aplicação deve ter UI (Tailwind CSS) e LÓGICA (JavaScript puro).
+    Exemplo: Se pedirem um gerador de legendas, cria um script JS que formata o texto em blocos. Se pedirem calculadora, cria a lógica matemática. Tem de funcionar no browser!
+
     Responde em JSON estrito com estas chaves:
     {{
-        "title": "Nome comercial curto e catita para a marca (máximo 3 palavras, ex: ViralCaps AI)",
-        "score": 10,
-        "summary": "Resumo de 1 frase do problema e solução.",
-        "action_plan": "Estratégia de monetização.",
-        "product_concept": "Descrição técnica.",
-        "code_payload": "# Código funcional\\nprint('Pronto!')",
-        "social_post": "Post para redes.",
-        "video_script": "🎬 [0-3s Gancho]: 'Chega de perder tempo!'\\n🎬 [3-20s Solução]: 'Usa esta automação rápida e simples.'\\n🎬 [20-30s CTA]: 'Clica no link na bio!'",
-        "cold_email": "Assunto: Automação\\n\\nOlá..."
+        "title": "Nome de marca curto (ex: FluxoAI)",
+        "summary": "Ferramenta gratuita para {topic}",
+        "product_concept": "Arquitetura técnica da aplicação gerada.",
+        "social_post": "Lançámos hoje o {{title}}! Testa a nossa nova ferramenta 100% grátis e funcional aqui: [LINK]",
+        "video_script": "🎬 [0-3s Gancho]: 'Testa esta ferramenta!'\\n🎬 [3-20s Solução]: 'Vê como funciona na prática.'\\n🎬 [20-30s CTA]: 'Link na bio!'",
+        "functional_html": "CÓDIGO COMPLETO HTML + TAILWIND + JAVASCRIPT AQUI. Tem de ter um input, um botão 'Executar' e uma div de 'Resultado' onde o JavaScript injeta o output processado."
     }}
     """
     
@@ -104,7 +107,7 @@ async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Orde
         completion = ai.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=[
-                {"role": "system", "content": "És um diretor criativo focado em conversão. Responde apenas em JSON."},
+                {"role": "system", "content": "És um programador de elite focado em utilitários web de execução rápida (Single Page Apps). Responde EXCLUSIVAMENTE em JSON válido."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3
@@ -119,28 +122,28 @@ async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Orde
             if json_match:
                 data = json.loads(json_match.group(0))
 
-        # Se a IA por acaso falhar, cortamos o título para não quebrar a página
-        raw_title = data.get("title", "BLING Product")
-        title = raw_title if len(raw_title) < 40 else "BLING Product"
+        title = data.get("title", "AppFuncional")
+        if len(title) > 30: title = "MicroTool"
         
-        summary = data.get("summary", "A tua nova solução automatizada.")
-        product_concept = data.get("product_concept", "Micro-ferramenta SaaS.")
+        summary = data.get("summary", "A tua nova ferramenta.")
+        product_concept = data.get("product_concept", "Aplicação Web SPA.")
         social_post = data.get("social_post", f"🚀 Acabei de lançar o {title}!")
-        video_script = data.get("video_script", f"🎬 [0-3s Gancho]: Pára tudo!\n🎬 [3-20s Solução]: Sistema pronto.\n🎬 [20-30s CTA]: Link na bio!")
+        video_script = data.get("video_script", f"🎬 [0-3s Gancho]: Pára tudo!\n🎬 [3-20s Solução]: Ferramenta lançada.\n🎬 [20-30s CTA]: Link na bio!")
+        
+        # O HTML gerado pela IA (A ferramenta real!)
+        functional_html = data.get("functional_html", f"<h1>Erro ao gerar a aplicação {title}</h1>")
         
         image_url = generate_ai_banner_image(title)
         audio_url = generate_cloud_neural_voice(video_script)
         video_url = FALLBACK_VIDEO_URL
         
-        landing_page_html = f"""<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script><title>{title}</title></head><body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-6"><div class="absolute top-6 left-6 text-xl font-bold text-emerald-400 tracking-tighter">{title}</div><h1 class="text-5xl md:text-6xl font-extrabold text-white mb-6 text-center tracking-tight max-w-4xl">{title}</h1><p class="text-slate-400 text-lg md:text-xl text-center mb-12 max-w-2xl">{summary}</p><div class="bg-slate-900 p-8 md:p-10 rounded-3xl w-full max-w-md border border-slate-800 shadow-2xl shadow-emerald-900/10"><h3 class="text-xl font-bold mb-6 text-center">Garantir Acesso Antecipado</h3><input type="email" id="leadEmail" placeholder="O teu melhor email..." class="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 text-white mb-4 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"><button class="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition shadow-lg shadow-emerald-500/20 text-lg" onclick="sendLead()">Quero Aceder</button><div id="successMsg" class="hidden text-emerald-400 font-semibold text-center pt-6">✅ Inscrição confirmada com sucesso!</div></div><script>async function sendLead() {{ const email = document.getElementById('leadEmail').value; if (!email) return; try {{ await fetch('https://web-production-803c4.up.railway.app/api/leads', {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }}, body: JSON.stringify({{ product_name: '{title}', email: email }}) }}); document.getElementById('successMsg').classList.remove('hidden'); }} catch(e) {{}} }}</script></body></html>"""
-
-        save_opportunity_to_supabase(
+        opp_id = save_opportunity_to_supabase(
             source=source, title=title, score=10, summary=summary,
-            action_plan=data.get("action_plan", ""), social_post=social_post,
-            product_concept=product_concept, code_payload=data.get("code_payload", ""),
-            landing_page_html=landing_page_html, video_script=video_script,
+            action_plan="Monetização Fase 2 (Stripe)", social_post=social_post,
+            product_concept=product_concept, code_payload="Lógica JS injetada na UI",
+            landing_page_html=functional_html, video_script=video_script,
             video_url=video_url, image_url=image_url, audio_url=audio_url,
-            cold_email=data.get("cold_email", "")
+            cold_email="N/A"
         )
         
         return data
@@ -153,7 +156,7 @@ async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Orde
 async def lifespan(app: FastAPI):
     yield
 
-app = FastAPI(title="BLING AI Media Studio", lifespan=lifespan)
+app = FastAPI(title="BLING AI Execution Engine", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 class AgentRequest(BaseModel):
@@ -190,7 +193,7 @@ async def capture_lead(lead: LeadRequest):
         raise HTTPException(status_code=500, detail="Supabase não configurado")
     try:
         supabase.table("leads").insert({"product_name": lead.product_name, "email": lead.email}).execute()
-        await send_telegram_alert(f"🎉 *NOVO LEAD CAPTURADO!*\n\n📦 *Produto:* {lead.product_name}\n📧 *Email:* `{lead.email}`")
+        await send_telegram_alert(f"🎉 *NOVO LEAD/CLIENTE!*\n\n📦 *Ferramenta:* {lead.product_name}\n📧 *Email:* `{lead.email}`")
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -198,7 +201,6 @@ async def capture_lead(lead: LeadRequest):
 @app.get("/api/tts")
 async def proxy_tts(text: str):
     clean_text = urllib.parse.unquote(text)[:600]
-    
     if EDGE_TTS_AVAILABLE:
         try:
             communicate = edge_tts.Communicate(clean_text, "pt-PT-DuarteNeural")
@@ -228,7 +230,7 @@ async def run_agent(req: AgentRequest):
         
         client = Groq(api_key=groq_key)
         await build_product_asset_pipeline(client, req.prompt, source="Ordem Manual")
-        return {"result": f"✅ [SUCESSO!]\n\nAtivo criado! Testa agora a nova Landing Page limpa e organizada."}
+        return {"result": f"✅ [SOFTWARE FUNCIONAL CRIADO!]\n\nA IA acabou de programar e lançar a tua aplicação. Clica em 'Abrir URL Pública' no cartão para testares a ferramenta real."}
     except Exception as e:
         return {"result": f"Erro interno: {str(e)}"}
 
