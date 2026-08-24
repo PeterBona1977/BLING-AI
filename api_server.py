@@ -123,7 +123,7 @@ async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manua
     """
     
     completion = ai.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model="openai/gpt-oss-20b",
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0.2
@@ -193,7 +193,7 @@ def get_status():
     return {
         "status": "online",
         "agent": "BLING-AI Ultra-Fast Engine",
-        "model": "llama-3.1-8b-instant",
+        "model": "openai/gpt-oss-20b",
         "database": "Supabase PostgreSQL"
     }
 
@@ -237,7 +237,7 @@ async def run_agent(req: AgentRequest):
 
         # 4. Resposta Geral
         completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",
             messages=[
                 {"role": "system", "content": "És o consultor executivo BLING-AI. Responde de forma concisa e direta."},
                 {"role": "user", "content": req.prompt}
