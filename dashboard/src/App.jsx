@@ -59,12 +59,11 @@ export default function App() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  // Renderização nativa via Blob (resolve conflito de aspas e document.write)
   const handlePreviewHtml = (html) => {
-    const win = window.open("", "_blank");
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-    }
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
   };
 
   const handleAskAgent = async (e) => {
@@ -82,6 +81,7 @@ export default function App() {
       });
       const data = await res.json();
       setAgentResponse(data.result || "Sem resposta.");
+      fetchData();
     } catch (err) {
       setAgentResponse("Erro ao contactar o agente.");
     } finally {
@@ -98,7 +98,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight">BLING AI Autonomous Engine</h1>
-            <p className="text-xs text-slate-400">Pipeline de Produtos Digitais & Landing Pages</p>
+            <p className="text-xs text-slate-400">Pipeline Comercial & Captura de Leads</p>
           </div>
         </div>
 
@@ -204,7 +204,7 @@ export default function App() {
                             className="text-xs font-medium text-emerald-400 flex items-center gap-1.5 hover:underline"
                           >
                             <Code2 className="w-3.5 h-3.5" />
-                            <span>{openCodeId === opp.id ? "Ocultar Código do Produto" : "Ver Código do Produto"}</span>
+                            <span>{openCodeId === opp.id ? "Ocultar Código" : "Ver Código"}</span>
                             {openCodeId === opp.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                           </button>
                           <button
@@ -212,7 +212,7 @@ export default function App() {
                             className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded transition"
                           >
                             {copiedId === `code-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                            <span>{copiedId === `code-${opp.id}` ? "Copiado!" : "Copiar"}</span>
+                            <span>{copiedId === `code-${opp.id}` ? "Copiado!" : "Copiar Código"}</span>
                           </button>
                         </div>
                         {openCodeId === opp.id && (
