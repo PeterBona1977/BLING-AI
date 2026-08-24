@@ -43,7 +43,6 @@ def generate_cloud_neural_voice(script_text: str) -> str:
     encoded_text = urllib.parse.quote(clean_text)
     return f"https://web-production-803c4.up.railway.app/api/tts?text={encoded_text}"
 
-# VÍDEO CORRIGIDO: Link da Google (100% livre de bloqueios)
 FALLBACK_VIDEO_URL = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
 
 # 3. Despacho no Telegram
@@ -83,55 +82,44 @@ def save_opportunity_to_supabase(
         print(f"[DB Error]: {e}")
         return None
 
-# 5. MOTOR: INTELIGÊNCIA LIBERTADA
+# 5. MOTOR COM MODELO POTENTE (Llama 3.3 70B)
 async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Ordem Manual"):
     prompt = f"""
-    És um Engenheiro de Software Full-Stack e Diretor Criativo de Marketing Viral.
-    O utilizador pediu para criares um produto com base nesta ideia: '{topic}'.
+    És um Arquiteto de Software de Elite e Diretor de Marketing Viral.
+    O utilizador pediu: '{topic}'.
     
-    A TUA TAREFA É:
-    1. Escrever uma APLICAÇÃO WEB FUNCIONAL (Micro-SaaS) em HTML/Tailwind/JS.
-    2. Escrever guiões de vendas MUITO PERSUASIVOS, CRIATIVOS E LONGOS (não uses placeholders).
-
-    Responde em JSON estrito com estas chaves e gera CONTEÚDO ORIGINAL em cada uma:
+    Gera um projeto completo e original. Responde estritamente em JSON com esta estrutura exata:
     {{
-        "title": "Gera um nome curto e forte para a marca.",
-        "summary": "Escreve uma frase de marketing agressiva a explicar a dor que o produto resolve.",
-        "product_concept": "Descreve como a ferramenta funciona por trás.",
-        "social_post": "Escreve um post viral e autêntico para LinkedIn/X, com história, emojis e CTA claro.",
-        "video_script": "Escreve um guião para TikTok super persuasivo. Usa EXATAMENTE este formato:\\n🎬 [0-3s Gancho]: '(Texto forte a chamar a atenção)'\\n🎬 [3-20s Solução]: '(Explicação entusiasmante do produto)'\\n🎬 [20-30s CTA]: '(Chamada para ação matadora)'",
-        "functional_html": "<html lang='pt'>...CÓDIGO HTML COM SCRIPT FUNCIONAL...</html>"
+        "title": "Um nome comercial criativo, forte e curto para o micro-SaaS",
+        "summary": "Uma frase de impacto comercial forte sobre o valor da ferramenta",
+        "product_concept": "Explicação técnica detalhada de como a aplicação resolve o problema",
+        "social_post": "Um post autêntico e profissional para o LinkedIn/X promovendo a ferramenta",
+        "video_script": "🎬 [0-3s Gancho]: (Frase chocante)\\n🎬 [3-20s Solução]: (Explicação envolvente)\\n🎬 [20-30s CTA]: (Chamada forte)",
+        "functional_html": "<!DOCTYPE html><html lang='pt'><head><meta charset='UTF-8'><script src='https://cdn.tailwindcss.com'></script></head><body class='bg-slate-950 text-white min-h-screen flex flex-col items-center justify-center p-6'><div class='max-w-xl w-full bg-slate-900 p-8 rounded-2xl border border-slate-800'><h1 class='text-2xl font-bold text-emerald-400 mb-4'>Ferramenta</h1><!-- INCLUI AQUI LOGICA JAVASCRIPT REAL E FUNCIONAL PARA O QUE FOI PEDIDO --></div></body></html>"
     }}
-    NOTA: Usa apenas aspas simples (') dentro do functional_html para não quebrar o JSON.
     """
     
     try:
+        # Usamos o modelo de topo da Groq com suporte a JSON mode estrito
         completion = ai.chat.completions.create(
-            model="openai/gpt-oss-20b",
+            model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "És uma IA brilhante em copywritting e código. Responde EXCLUSIVAMENTE em JSON válido."},
+                {"role": "system", "content": "És um programador senior e copywriter de conversão. Deves responder estritamente num objeto JSON válido."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.5 # Aumentei a temperatura para a IA ser mais criativa
+            response_format={"type": "json_object"},
+            temperature=0.4
         )
         
         raw_content = completion.choices[0].message.content
-        data = {}
-        try:
-            data = json.loads(raw_content)
-        except:
-            json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group(0))
+        data = json.loads(raw_content)
 
-        title = data.get("title", "AppFuncional")
-        if len(title) > 40: title = "Ferramenta Pro"
-        
-        summary = data.get("summary", "A tua nova ferramenta.")
+        title = data.get("title", "SaaSPro")
+        summary = data.get("summary", "Ferramenta otimizada.")
         product_concept = data.get("product_concept", "Aplicação Web SPA.")
-        social_post = data.get("social_post", f"🚀 Acabei de lançar o {title}!")
-        video_script = data.get("video_script", f"🎬 [0-3s Gancho]: Pára tudo!\n🎬 [3-20s Solução]: Ferramenta lançada.\n🎬 [20-30s CTA]: Link na bio!")
-        functional_html = data.get("functional_html", f"<h1>Erro ao gerar a aplicação</h1>")
+        social_post = data.get("social_post", f"🚀 Lançamento oficial do {title}!")
+        video_script = data.get("video_script", "🎬 [0-3s Gancho]: Vê isto!\n🎬 [3-20s Solução]: Revolucionário.\n🎬 [20-30s CTA]: Experimenta grátis!")
+        functional_html = data.get("functional_html", "<h1>Erro ao gerar UI</h1>")
         
         image_url = generate_ai_banner_image(title)
         audio_url = generate_cloud_neural_voice(video_script)
@@ -140,7 +128,7 @@ async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Orde
         opp_id = save_opportunity_to_supabase(
             source=source, title=title, score=10, summary=summary,
             action_plan="Monetização Direta", social_post=social_post,
-            product_concept=product_concept, code_payload="Lógica JS injetada",
+            product_concept=product_concept, code_payload="Lógica JS nativa",
             landing_page_html=functional_html, video_script=video_script,
             video_url=video_url, image_url=image_url, audio_url=audio_url,
             cold_email="N/A"
@@ -200,7 +188,7 @@ async def capture_lead(lead: LeadRequest):
 
 @app.get("/api/tts")
 async def proxy_tts(text: str):
-    clean_text = urllib.parse.unquote(text)[:800] # Aumentei o limite para textos mais compridos
+    clean_text = urllib.parse.unquote(text)[:1000]
     if EDGE_TTS_AVAILABLE:
         try:
             communicate = edge_tts.Communicate(clean_text, "pt-PT-DuarteNeural")
@@ -230,7 +218,7 @@ async def run_agent(req: AgentRequest):
         
         client = Groq(api_key=groq_key)
         await build_product_asset_pipeline(client, req.prompt, source="Ordem Manual")
-        return {"result": f"✅ [SOFTWARE E MÍDIA CRIADOS!]\n\nA IA acabou de desenhar o copy real, a locução neural e a ferramenta."}
+        return {"result": f"✅ [SOFTWARE DE ELITE GERADO!]\n\nO motor Llama 3.3 construiu um produto real, guião completo e áudio alargado."}
     except Exception as e:
         return {"result": f"Erro interno: {str(e)}"}
 
