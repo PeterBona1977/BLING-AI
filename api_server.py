@@ -3,12 +3,11 @@ import asyncio
 import json
 import re
 import urllib.parse
-import random
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
@@ -26,52 +25,20 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         print(f"[Supabase Init Error]: {e}")
 
-# 2. Geradores Cloud (Imagem, Áudio Neural e Vídeo MP4)
+# 2. Geradores Cloud Seguros
 def generate_ai_banner_image(topic: str) -> str:
     clean_prompt = f"Futuristic dark mode 3D SaaS application UI dashboard for {topic}, neon emerald lights, photorealistic, 8k render"
     encoded = urllib.parse.quote(clean_prompt)
     return f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&nologo=true&model=flux"
 
 def generate_cloud_neural_voice(script_text: str) -> str:
-    """Usa a Cloud API do Google TTS para gerar o áudio dinamicamente (Sem bloqueios CORS)"""
+    """Em vez de enviar a Google API para o frontend, enviamos para a nossa própria rota interna segura"""
     clean_text = re.sub(r'🎬 \[.*?\]: ', '', script_text).replace("'", "").replace('"', '')
     encoded_text = urllib.parse.quote(clean_text[:200])
-    return f"https://translate.google.com/translate_tts?ie=UTF-8&tl=pt-PT&client=tw-ob&q={encoded_text}"
+    return f"https://web-production-803c4.up.railway.app/api/tts?text={encoded_text}"
 
-async def render_tiktok_video(title: str, hook: str, cta: str) -> str:
-    """Renderiza vídeo MP4 com texto dinâmico via API ou usa fallbacks cloud robustos"""
-    api_key = os.getenv("CREATOMATE_API_KEY")
-    if api_key:
-        try:
-            url = "https://api.creatomate.com/v1/renders"
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-            payload = {
-                "output_format": "mp4",
-                "width": 1080,
-                "height": 1920,
-                "duration": 15,
-                "elements": [
-                    {"type": "video", "source": "https://creatomate-static.s3.amazonaws.com/demo/technology.mp4", "duration": 15},
-                    {"type": "text", "text": hook, "time": 0, "duration": 6, "font_family": "Montserrat", "font_weight": "800", "font_size": 65, "fill_color": "#10B981", "shadow_color": "#000000", "shadow_blur": 15},
-                    {"type": "text", "text": f"{title}\n\n{cta}", "time": 6, "duration": 9, "font_family": "Montserrat", "font_weight": "700", "font_size": 55, "fill_color": "#FFFFFF", "shadow_color": "#000000", "shadow_blur": 15}
-                ]
-            }
-            async with httpx.AsyncClient(timeout=25.0) as client:
-                r = await client.post(url, headers=headers, json=payload)
-                if r.status_code in [200, 202]:
-                    renders = r.json()
-                    if isinstance(renders, list) and len(renders) > 0:
-                        return renders[0].get("url")
-        except Exception as e:
-            print(f"[Creatomate Video Error]: {e}")
-    
-    # Fallback rotativo: Vídeos verticais na Google Cloud
-    fallbacks = [
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4"
-    ]
-    return random.choice(fallbacks)
+# Vídeo robusto com permissão global de CORS ativada
+FALLBACK_VIDEO_URL = "https://cdn.coverr.co/videos/coverr-digital-world-concept-6638/1080p.mp4"
 
 # 3. Despacho no Telegram
 async def send_telegram_alert(message_text: str):
@@ -123,9 +90,7 @@ async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Orde
         "product_concept": "Descrição técnica.",
         "code_payload": "# Código funcional\\nprint('Pronto!')",
         "social_post": "Post para redes.",
-        "video_hook": "Pára tudo se ainda fazes {topic} à mão!",
-        "video_cta": "Clica no link na bio para acesso imediato!",
-        "video_script": "🎬 [0-3s Gancho]: 'Pára tudo se ainda fazes {topic} à mão!'\\n🎬 [3-20s Solução]: 'Usa esta automação rápida e simples.'\\n🎬 [20-30s CTA]: 'Clica no link na bio!'",
+        "video_script": "🎬 [0-3s Gancho]: 'Chega de perder tempo com {topic}!'\\n🎬 [3-20s Solução]: 'Usa esta automação rápida e simples.'\\n🎬 [20-30s CTA]: 'Clica no link na bio!'",
         "cold_email": "Assunto: Automação para {topic}\\n\\nOlá..."
     }}
     """
@@ -154,16 +119,13 @@ async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Orde
         product_concept = data.get("product_concept", f"Micro-ferramenta {topic}")
         social_post = data.get("social_post", f"🚀 Acabei de automatizar '{topic}'!")
         video_script = data.get("video_script", f"🎬 [0-3s Gancho]: Pára tudo sobre {topic}!\n🎬 [3-20s Solução]: Sistema pronto.\n🎬 [20-30s CTA]: Link na bio!")
-        video_hook = data.get("video_hook", f"Chega de problemas com {topic}!")
-        video_cta = data.get("video_cta", "Link na bio!")
         
-        # Gera o Banner Visual, Áudio TTS e Vídeo Dinâmico
+        # Gera o link da Imagem e do Áudio Seguro
         image_url = generate_ai_banner_image(title)
         audio_url = generate_cloud_neural_voice(video_script)
-        video_url = await render_tiktok_video(title, video_hook, video_cta)
+        video_url = FALLBACK_VIDEO_URL
         
-        # HTML Básico da Landing Page
-        landing_page_html = f"""<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script><title>{title}</title></head><body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-6"><h1 class="text-4xl font-bold text-emerald-400 mb-4 text-center">{title}</h1><p class="text-slate-400 mb-8 text-center max-w-lg">{summary}</p><div class="bg-slate-900 p-8 rounded-2xl w-full max-w-md border border-slate-800"><input type="email" id="leadEmail" placeholder="O teu email..." class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-white mb-4 focus:outline-none focus:border-emerald-500"><button class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl transition" onclick="sendLead()">Garantir Acesso VIP</button><div id="successMsg" class="hidden text-emerald-400 font-semibold text-sm pt-4 text-center">✅ Inscrição confirmada! Entraremos em contacto.</div></div><script>async function sendLead() {{ const email = document.getElementById('leadEmail').value; if (!email) return; try {{ await fetch('https://web-production-803c4.up.railway.app/api/leads', {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }}, body: JSON.stringify({{ product_name: '{title}', email: email }}) }}); document.getElementById('successMsg').classList.remove('hidden'); }} catch(e) {{}} }}</script></body></html>"""
+        landing_page_html = f"""<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script><title>{title}</title></head><body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-6"><h1 class="text-4xl font-bold text-emerald-400 mb-4">{title}</h1><p class="text-slate-400 mb-8">{summary}</p><div class="bg-slate-900 p-8 rounded-2xl w-full max-w-md"><input type="email" id="leadEmail" placeholder="O teu email..." class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-white mb-4"><button class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl" onclick="sendLead()">Garantir Vaga</button><div id="successMsg" class="hidden text-emerald-400 font-semibold text-sm pt-4">✅ Inscrição confirmada!</div></div><script>async function sendLead() {{ const email = document.getElementById('leadEmail').value; if (!email) return; try {{ await fetch('https://web-production-803c4.up.railway.app/api/leads', {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }}, body: JSON.stringify({{ product_name: '{title}', email: email }}) }}); document.getElementById('successMsg').classList.remove('hidden'); }} catch(e) {{}} }}</script></body></html>"""
 
         save_opportunity_to_supabase(
             source=source, title=title, score=10, summary=summary,
@@ -227,6 +189,20 @@ async def capture_lead(lead: LeadRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# NOVO ENDPOINT (PROXY): O teu servidor processa a voz e transmite ao painel!
+@app.get("/api/tts")
+async def proxy_tts(text: str):
+    clean_text = text[:200]
+    url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl=pt-PT&client=tw-ob&q={urllib.parse.quote(clean_text)}"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(url)
+            if r.status_code == 200:
+                return Response(content=r.content, media_type="audio/mpeg")
+    except Exception as e:
+        print(f"TTS Proxy Error: {e}")
+    return Response(status_code=404)
+
 @app.post("/api/agent")
 async def run_agent(req: AgentRequest):
     try:
@@ -236,7 +212,7 @@ async def run_agent(req: AgentRequest):
         client = Groq(api_key=groq_key)
         await build_product_asset_pipeline(client, req.prompt, source="Ordem Manual")
         return {
-            "result": f"✅ [CONTEÚDO MULTIMÉDIA GERADO!]\n\nA IA acabou de compilar a Capa Visual, o Vídeo de Fundo e a Locução Neural."
+            "result": f"✅ [SUCESSO!]\n\nCapa de IA, Vídeo Seguro e Proxy de Áudio Neural configurados.\nCarrega no Play no Dashboard!"
         }
     except Exception as e:
         return {"result": f"Erro interno: {str(e)}"}
