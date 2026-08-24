@@ -6,6 +6,7 @@ from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
@@ -46,7 +47,10 @@ def save_opportunity_to_supabase(
     social_post: str = "", 
     product_concept: str = "",
     code_payload: str = "",
-    landing_page_html: str = ""
+    landing_page_html: str = "",
+    video_script: str = "",
+    ai_media_prompt: str = "",
+    cold_email: str = ""
 ):
     if not supabase:
         return "Supabase não configurado."
@@ -61,6 +65,9 @@ def save_opportunity_to_supabase(
             "product_concept": product_concept,
             "code_payload": code_payload,
             "landing_page_html": landing_page_html,
+            "video_script": video_script,
+            "ai_media_prompt": ai_media_prompt,
+            "cold_email": cold_email,
             "status": "detected"
         }).execute()
         return "Gravado com sucesso no Supabase."
@@ -78,7 +85,17 @@ def get_opportunities_from_supabase(limit: int = 30):
         print(f"[Supabase Read Error]: {e}")
         return []
 
-# 3. Multi-Scanner Feed
+def get_leads_from_supabase(limit: int = 50):
+    if not supabase:
+        return []
+    try:
+        response = supabase.table("leads").select("*").order("created_at", desc=True).limit(limit).execute()
+        return response.data
+    except Exception as e:
+        print(f"[Supabase Leads Error]: {e}")
+        return []
+
+# 3. Multi-Scanner Feed (HackerNews + Reddit)
 async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
     items = []
     try:
@@ -90,7 +107,7 @@ async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
     except Exception as e:
         print(f"[Fetch HN Error]: {e}")
 
-    for sub in ["SaaS", "SideProject"]:
+    for sub in ["SaaS", "SideProject", "Entrepreneur"]:
         try:
             headers = {"User-Agent": "Mozilla/5.0 (BLING-AI Scanner)"}
             r = await client.get(f"https://www.reddit.com/r/{sub}/new.json?limit=1", headers=headers)
@@ -106,26 +123,29 @@ async def fetch_feed_items(client: httpx.AsyncClient) -> List[Dict[str, str]]:
 
 async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manual"):
     prompt = f"""
-    Cria a solução completa para o produto digital: '{topic}'.
+    Cria um ecossistema completo de produto e marketing para a oportunidade: '{topic}'.
     Responde com as seguintes chaves em formato JSON:
     {{
         "title": "{topic}",
         "score": 10,
         "summary": "Resumo do problema e solução em 1 frase",
         "action_plan": "Estratégia de monetização direta",
-        "product_concept": "Descrição técnica da stack e arquitetura da ferramenta",
-        "code_payload": "# Script funcional\\nimport sys\\nprint('Ferramenta pronta')",
-        "social_post": "Post viral pronto para LinkedIn / X com gancho e CTA"
+        "product_concept": "Descrição técnica e arquitetura da ferramenta",
+        "code_payload": "# Script Python/JS funcional\\nprint('Ferramenta {topic} pronta')",
+        "social_post": "Post persuasivo para LinkedIn e X com gancho e CTA",
+        "video_script": "🎬 [0-3s Gancho]: 'Texto falado e instrução visual'\\n🎬 [3-20s Problema & Demonstração]: 'Texto do guião'\\n🎬 [20-30s CTA]: 'Clica no link na bio para aceder'",
+        "ai_media_prompt": "Cinematic visual prompt for Midjourney / Runway video: Futuristic minimal UI dashboard showing {topic}, 8k, photorealistic studio lighting",
+        "cold_email": "Assunto: Oportunidade rápida sobre {topic}\\n\\nOlá,\\nreparei na necessidade recente de {topic} e desenvolvemos uma solução automatizada..."
     }}
     """
     
     completion = ai.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=[
-            {"role": "system", "content": "És um arquiteto de SaaS e produtos digitais de alta conversão. Responde estritamente em JSON."},
+            {"role": "system", "content": "És um Diretor de Marketing Viral e Engenheiro de Software Full Stack. Responde com JSON estrito."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.2
+        temperature=0.3
     )
     
     raw_content = completion.choices[0].message.content
@@ -142,12 +162,14 @@ async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manua
 
     title = data.get("title", topic)
     summary = data.get("summary", f"Solução automatizada para: {topic}")
-    action_plan = data.get("action_plan", "Monetização via subscrição mensal ou pagamento único.")
+    action_plan = data.get("action_plan", "Monetização via subscrição ou pagamento único.")
     product_concept = data.get("product_concept", f"Micro-ferramenta orientada a resolver {topic}")
     code_payload = data.get("code_payload", f"# Boilerplate funcional para {topic}\nimport os\nprint('Módulo ativo')")
-    social_post = data.get("social_post", f"🚀 Acabei de automatizar '{topic}'!\n\n1. Rápido\n2. Escalável\n\nQueres testar? Comenta 'EU QUERO'.")
+    social_post = data.get("social_post", f"🚀 Acabei de automatizar '{topic}'!\n\n1. Rápido\n2. Escalável\n\nQueres testar? Acede ao link abaixo.")
+    video_script = data.get("video_script", f"🎬 [0-3s Gancho]: Pára tudo se ainda perdes horas com {topic}!\n🎬 [3-20s Solução]: Criámos um sistema automático que resolve isto em 1 clique.\n🎬 [20-30s CTA]: Link na bio para garantir acesso VIP!")
+    ai_media_prompt = data.get("ai_media_prompt", f"High tech futuristic SaaS UI mockup for {topic}, dark neon aesthetic, ultra detailed, 8k render")
+    cold_email = data.get("cold_email", f"Assunto: Solução para {topic}\n\nOlá,\nDesenvolvemos uma automação para {topic} que reduz em 80% o tempo manual. Podemos demonstrar?")
     
-    # Landing page com leitura dinâmica do DOM para evitar quebra por aspas
     landing_page_html = f"""<!DOCTYPE html>
 <html lang="pt">
 <head>
@@ -162,7 +184,7 @@ async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manua
     <a href="#cta" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-4 py-2 rounded-xl text-sm transition">Garantir Acesso</a>
   </header>
   <main class="max-w-4xl mx-auto px-6 py-12 text-center">
-    <span class="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4 inline-block">Acesso Antecipado</span>
+    <span class="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4 inline-block">Acesso VIP</span>
     <h1 id="productTitle" class="text-3xl md:text-5xl font-extrabold text-white tracking-tight mb-6">{title}</h1>
     <p class="text-base md:text-lg text-slate-400 mb-10 max-w-2xl mx-auto">{summary}</p>
     
@@ -211,7 +233,7 @@ async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manua
           btn.innerText = 'Entrar na Lista VIP';
         }}
       }} catch(e) {{
-        alert('Erro de conexão com o servidor.');
+        alert('Erro de conexão.');
         btn.disabled = false;
         btn.innerText = 'Entrar na Lista VIP';
       }}
@@ -229,17 +251,21 @@ async def generate_fast_product(ai: Groq, topic: str, source: str = "Ordem Manua
         social_post=social_post,
         product_concept=product_concept,
         code_payload=code_payload,
-        landing_page_html=landing_page_html
+        landing_page_html=landing_page_html,
+        video_script=video_script,
+        ai_media_prompt=ai_media_prompt,
+        cold_email=cold_email
     )
     
-    tg_text = f"🚀 *NOVO PRODUTO CRIADO!*\n\n📦 *Tema:* {title}\n💡 *Conceito:* {product_concept}\n\n📱 *Post:* {social_post[:180]}..."
+    tg_text = f"🚀 *NOVO PRODUTO & VÍDEO TIKTOK CRIADOS!*\n\n📦 *Tema:* {title}\n💡 *Produto:* {product_concept}\n🎬 *Vídeo:* {video_script[:120]}..."
     await send_telegram_alert(tg_text)
     
     return {
         "title": title,
         "product_concept": product_concept,
         "summary": summary,
-        "social_post": social_post
+        "video_script": video_script,
+        "ai_media_prompt": ai_media_prompt
     }
 
 # 4. Background Scanner
@@ -264,7 +290,7 @@ async def lifespan(app: FastAPI):
     yield
     task.cancel()
 
-app = FastAPI(title="BLING AI Full Commercial Engine", lifespan=lifespan)
+app = FastAPI(title="BLING AI Viral Marketing & Product Engine", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -290,9 +316,8 @@ def health():
 def get_status():
     return {
         "status": "online",
-        "agent": "BLING-AI Commercial Engine",
-        "lead_capture": "Active",
-        "model": "openai/gpt-oss-20b",
+        "agent": "BLING-AI Viral & Commercial Engine",
+        "features": ["TikTok Video Scripts", "AI Visual Prompts", "B2B Cold Emails", "Public Landing Pages"],
         "database": "Supabase PostgreSQL"
     }
 
@@ -300,7 +325,24 @@ def get_status():
 def list_opportunities():
     return {"opportunities": get_opportunities_from_supabase(limit=30)}
 
-# Endpoint de Captura de Leads com Notificação Imediata no Telegram
+@app.get("/api/leads")
+def list_leads():
+    return {"leads": get_leads_from_supabase(limit=50)}
+
+# Rota pública de hospedagem de Landing Pages
+@app.get("/p/{opp_id}", response_class=HTMLResponse)
+def serve_landing_page(opp_id: int):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase não configurado")
+    
+    try:
+        res = supabase.table("opportunities").select("landing_page_html").eq("id", opp_id).execute()
+        if res.data and len(res.data) > 0 and res.data[0].get("landing_page_html"):
+            return res.data[0]["landing_page_html"]
+        raise HTTPException(status_code=404, detail="Landing Page não encontrada.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/leads")
 async def capture_lead(lead: LeadRequest):
     if not supabase:
@@ -340,24 +382,26 @@ async def run_agent(req: AgentRequest):
                 feed = await fetch_feed_items(http_c)
                 for item in feed:
                     await generate_fast_product(client, item["title"], source=item["source"])
-            return {"result": f"⚡ [SCAN EXECUTADO]: {len(feed)} novos itens processados e gravados!"}
+            return {"result": f"⚡ [SCAN EXECUTADO]: {len(feed)} novos itens processados e gravados com guiões de vídeo!"}
 
-        # 3. Criação de Produto / Código / Micro-SaaS
-        if any(k in p_lower for k in ["cria", "gera", "faz", "produto", "saas", "código", "landing", "script", "micro"]):
+        # 3. Criação de Produto / Vídeo / Campanha
+        if any(k in p_lower for k in ["cria", "gera", "faz", "produto", "saas", "código", "landing", "script", "tiktok", "video", "email"]):
             data = await generate_fast_product(client, req.prompt, source="Ordem Manual")
             return {
-                "result": f"✅ [PRODUTO CRIADO E GRAVADO NO SUPABASE!]\n\n"
-                          f"📦 Conceito: {data.get('product_concept')}\n\n"
-                          f"💻 Código Funcional & Landing Page Compilada com Captura de Leads Ativa!\n"
-                          f"📲 Alerta Telegram Enviado.\n\n"
-                          f"(O novo ativo já está no topo da lista no teu dashboard)"
+                "result": f"✅ [PRODUTO & CAMPANHA VIRAL CRIADOS COM SUCESSO!]\n\n"
+                          f"📦 Produto: {data.get('product_concept')}\n\n"
+                          f"🎬 Guião de Vídeo (TikTok/Reels): Gerado\n"
+                          f"🎨 Prompt de Vídeo/Imagem IA: Gerado\n"
+                          f"🌐 Landing Page Pública: Compilada\n"
+                          f"📲 Alerta Telegram: Enviado\n\n"
+                          f"Vê os novos blocos de vídeo e imagem no dashboard!"
             }
 
         # 4. Chat Geral
         completion = client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=[
-                {"role": "system", "content": "És o consultor executivo BLING-AI. Responde de forma concisa e direta."},
+                {"role": "system", "content": "És o consultor executivo e estratega de conteúdo BLING-AI."},
                 {"role": "user", "content": req.prompt}
             ],
             temperature=0.3
