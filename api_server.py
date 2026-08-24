@@ -31,9 +31,8 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         print(f"[Supabase Init Error]: {e}")
 
-# 2. Geradores Cloud Seguros (Corrigido Imagem e Vídeo)
+# 2. Geradores Cloud Seguros
 def generate_ai_banner_image(topic: str) -> str:
-    # Limpa caracteres estranhos que possam quebrar a URL da imagem
     safe_topic = re.sub(r'[^a-zA-Z0-9 ]', '', topic)
     clean_prompt = f"Futuristic dark mode 3D SaaS application UI dashboard for {safe_topic}, neon emerald lights, photorealistic, 8k render"
     encoded = urllib.parse.quote(clean_prompt)
@@ -44,7 +43,7 @@ def generate_cloud_neural_voice(script_text: str) -> str:
     encoded_text = urllib.parse.quote(clean_text)
     return f"https://web-production-803c4.up.railway.app/api/tts?text={encoded_text}"
 
-# VÍDEO CORRIGIDO: Link do Google Cloud (Garante que a imagem aparece e nunca fica ecrã preto)
+# VÍDEO CORRIGIDO: Link da Google (100% livre de bloqueios)
 FALLBACK_VIDEO_URL = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
 
 # 3. Despacho no Telegram
@@ -84,35 +83,36 @@ def save_opportunity_to_supabase(
         print(f"[DB Error]: {e}")
         return None
 
-# 5. MOTOR: ENGENHEIRO DE SOFTWARE FUNCIONAL
+# 5. MOTOR: INTELIGÊNCIA LIBERTADA
 async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Ordem Manual"):
     prompt = f"""
-    És um Engenheiro de Software Full-Stack e Diretor de Produto.
-    O utilizador pediu uma ferramenta baseada nesta ideia: '{topic}'.
+    És um Engenheiro de Software Full-Stack e Diretor Criativo de Marketing Viral.
+    O utilizador pediu para criares um produto com base nesta ideia: '{topic}'.
     
-    CRIA UMA APLICAÇÃO WEB FUNCIONAL (Micro-SaaS).
-    A aplicação deve ter UI (Tailwind CSS) e LÓGICA (JavaScript puro) dentro do HTML.
-    NOTA IMPORTANTE: No HTML gerado, usa aspas simples para os atributos (ex: class='bg-black') para não quebrar o formato JSON.
+    A TUA TAREFA É:
+    1. Escrever uma APLICAÇÃO WEB FUNCIONAL (Micro-SaaS) em HTML/Tailwind/JS.
+    2. Escrever guiões de vendas MUITO PERSUASIVOS, CRIATIVOS E LONGOS (não uses placeholders).
 
-    Responde em JSON estrito com estas chaves:
+    Responde em JSON estrito com estas chaves e gera CONTEÚDO ORIGINAL em cada uma:
     {{
-        "title": "Nome curto de marca",
-        "summary": "Ferramenta gratuita para {topic}",
-        "product_concept": "Arquitetura técnica da aplicação gerada.",
-        "social_post": "Lançámos hoje o {{title}}! Testa a nossa ferramenta grátis: [LINK]",
-        "video_script": "🎬 [0-3s Gancho]: 'Testa esta ferramenta!'\\n🎬 [3-20s Solução]: 'Vê como funciona na prática.'\\n🎬 [20-30s CTA]: 'Link na bio!'",
+        "title": "Gera um nome curto e forte para a marca.",
+        "summary": "Escreve uma frase de marketing agressiva a explicar a dor que o produto resolve.",
+        "product_concept": "Descreve como a ferramenta funciona por trás.",
+        "social_post": "Escreve um post viral e autêntico para LinkedIn/X, com história, emojis e CTA claro.",
+        "video_script": "Escreve um guião para TikTok super persuasivo. Usa EXATAMENTE este formato:\\n🎬 [0-3s Gancho]: '(Texto forte a chamar a atenção)'\\n🎬 [3-20s Solução]: '(Explicação entusiasmante do produto)'\\n🎬 [20-30s CTA]: '(Chamada para ação matadora)'",
         "functional_html": "<html lang='pt'>...CÓDIGO HTML COM SCRIPT FUNCIONAL...</html>"
     }}
+    NOTA: Usa apenas aspas simples (') dentro do functional_html para não quebrar o JSON.
     """
     
     try:
         completion = ai.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=[
-                {"role": "system", "content": "És um programador focado em ferramentas web Single Page. Responde EXCLUSIVAMENTE em JSON válido."},
+                {"role": "system", "content": "És uma IA brilhante em copywritting e código. Responde EXCLUSIVAMENTE em JSON válido."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3
+            temperature=0.5 # Aumentei a temperatura para a IA ser mais criativa
         )
         
         raw_content = completion.choices[0].message.content
@@ -125,24 +125,22 @@ async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Orde
                 data = json.loads(json_match.group(0))
 
         title = data.get("title", "AppFuncional")
-        if len(title) > 30: title = "MicroTool"
+        if len(title) > 40: title = "Ferramenta Pro"
         
         summary = data.get("summary", "A tua nova ferramenta.")
         product_concept = data.get("product_concept", "Aplicação Web SPA.")
         social_post = data.get("social_post", f"🚀 Acabei de lançar o {title}!")
         video_script = data.get("video_script", f"🎬 [0-3s Gancho]: Pára tudo!\n🎬 [3-20s Solução]: Ferramenta lançada.\n🎬 [20-30s CTA]: Link na bio!")
+        functional_html = data.get("functional_html", f"<h1>Erro ao gerar a aplicação</h1>")
         
-        functional_html = data.get("functional_html", f"<h1>Erro ao gerar a aplicação {title}</h1>")
-        
-        # Gera o banner visual IA e a Voz
         image_url = generate_ai_banner_image(title)
         audio_url = generate_cloud_neural_voice(video_script)
         video_url = FALLBACK_VIDEO_URL
         
         opp_id = save_opportunity_to_supabase(
             source=source, title=title, score=10, summary=summary,
-            action_plan="Monetização Fase 2 (Stripe)", social_post=social_post,
-            product_concept=product_concept, code_payload="Lógica JS injetada na UI",
+            action_plan="Monetização Direta", social_post=social_post,
+            product_concept=product_concept, code_payload="Lógica JS injetada",
             landing_page_html=functional_html, video_script=video_script,
             video_url=video_url, image_url=image_url, audio_url=audio_url,
             cold_email="N/A"
@@ -202,7 +200,7 @@ async def capture_lead(lead: LeadRequest):
 
 @app.get("/api/tts")
 async def proxy_tts(text: str):
-    clean_text = urllib.parse.unquote(text)[:600]
+    clean_text = urllib.parse.unquote(text)[:800] # Aumentei o limite para textos mais compridos
     if EDGE_TTS_AVAILABLE:
         try:
             communicate = edge_tts.Communicate(clean_text, "pt-PT-DuarteNeural")
@@ -232,7 +230,7 @@ async def run_agent(req: AgentRequest):
         
         client = Groq(api_key=groq_key)
         await build_product_asset_pipeline(client, req.prompt, source="Ordem Manual")
-        return {"result": f"✅ [SOFTWARE E MÍDIA CRIADOS!]\n\nA Capa Visual, o Vídeo MP4 e o Código Funcional foram gerados na perfeição."}
+        return {"result": f"✅ [SOFTWARE E MÍDIA CRIADOS!]\n\nA IA acabou de desenhar o copy real, a locução neural e a ferramenta."}
     except Exception as e:
         return {"result": f"Erro interno: {str(e)}"}
 
