@@ -14,6 +14,13 @@ import httpx
 from groq import Groq
 from supabase import create_client, Client
 
+# Importar a biblioteca de Voz Neural
+try:
+    import edge_tts
+    EDGE_TTS_AVAILABLE = True
+except ImportError:
+    EDGE_TTS_AVAILABLE = False
+
 # 1. Supabase Setup
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -32,9 +39,9 @@ def generate_ai_banner_image(topic: str) -> str:
     return f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&nologo=true&model=flux"
 
 def generate_cloud_neural_voice(script_text: str) -> str:
-    """Em vez de enviar a Google API para o frontend, enviamos para a nossa própria rota interna segura"""
+    """Passa o texto para a nossa rota interna segura que vai gerar a Voz Neural em tempo real"""
     clean_text = re.sub(r'🎬 \[.*?\]: ', '', script_text).replace("'", "").replace('"', '')
-    encoded_text = urllib.parse.quote(clean_text[:200])
+    encoded_text = urllib.parse.quote(clean_text)
     return f"https://web-production-803c4.up.railway.app/api/tts?text={encoded_text}"
 
 # Vídeo robusto com permissão global de CORS ativada
@@ -189,18 +196,36 @@ async def capture_lead(lead: LeadRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# NOVO ENDPOINT (PROXY): O teu servidor processa a voz e transmite ao painel!
+# NOVO ENDPOINT DE VOZ NEURAL (Edge TTS em Memória)
 @app.get("/api/tts")
 async def proxy_tts(text: str):
-    clean_text = text[:200]
-    url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl=pt-PT&client=tw-ob&q={urllib.parse.quote(clean_text)}"
+    clean_text = urllib.parse.unquote(text)[:600]
+    
+    # 1. Tentar gerar voz hiper-realista com a IA da Microsoft (Edge-TTS)
+    if EDGE_TTS_AVAILABLE:
+        try:
+            # Usa uma voz natural em Português de Portugal (ou podes trocar para pt-BR-AntonioNeural para sotaque BR de TikTok)
+            communicate = edge_tts.Communicate(clean_text, "pt-PT-DuarteNeural")
+            audio_data = bytearray()
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    audio_data.extend(chunk["data"])
+            
+            # Devolve o áudio diretamente para o browser sem gravar no disco!
+            return Response(content=bytes(audio_data), media_type="audio/mpeg")
+        except Exception as e:
+            print(f"[Neural TTS Error]: {e}")
+
+    # 2. Fallback de emergência caso a Microsoft falhe
+    url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl=pt-PT&client=tw-ob&q={urllib.parse.quote(clean_text[:200])}"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             r = await client.get(url)
             if r.status_code == 200:
                 return Response(content=r.content, media_type="audio/mpeg")
     except Exception as e:
-        print(f"TTS Proxy Error: {e}")
+        pass
+
     return Response(status_code=404)
 
 @app.post("/api/agent")
@@ -212,7 +237,7 @@ async def run_agent(req: AgentRequest):
         client = Groq(api_key=groq_key)
         await build_product_asset_pipeline(client, req.prompt, source="Ordem Manual")
         return {
-            "result": f"✅ [SUCESSO!]\n\nCapa de IA, Vídeo Seguro e Proxy de Áudio Neural configurados.\nCarrega no Play no Dashboard!"
+            "result": f"✅ [SUCESSO!]\n\nCapa de IA, Vídeo Seguro e Áudio Neural configurados.\nCarrega no Play no Dashboard!"
         }
     except Exception as e:
         return {"result": f"Erro interno: {str(e)}"}
