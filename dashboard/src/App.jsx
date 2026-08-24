@@ -18,7 +18,7 @@ import {
   Link,
   Video,
   Image as ImageIcon,
-  Mail
+  Play
 } from 'lucide-react';
 
 const BACKEND_URL = "https://web-production-803c4.up.railway.app";
@@ -55,7 +55,7 @@ export default function App() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
+    const interval = setInterval(fetchData, 20000);
     return () => clearInterval(interval);
   }, []);
 
@@ -96,8 +96,8 @@ export default function App() {
             <Zap className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">BLING AI Viral Marketing & Product Engine</h1>
-            <p className="text-xs text-slate-400">Produtos Digitais + Vídeos TikTok/Reels + CRM</p>
+            <h1 className="text-xl font-bold tracking-tight">BLING AI Multimedia Content Studio</h1>
+            <p className="text-xs text-slate-400">Vídeos MP4 Reais + Imagens IA + Landing Pages + CRM</p>
           </div>
         </div>
 
@@ -111,7 +111,7 @@ export default function App() {
           </button>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs">
             <span className={`w-2 h-2 rounded-full ${status ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`}></span>
-            <span className="text-slate-300">{status ? 'Autonomia 100%' : 'Offline'}</span>
+            <span className="text-slate-300">{status ? 'Estúdio Ativo' : 'Offline'}</span>
           </div>
         </div>
       </header>
@@ -126,7 +126,7 @@ export default function App() {
             }`}
         >
           <TrendingUp className="w-4 h-4" />
-          <span>Oportunidades & Campanhas ({opportunities.length})</span>
+          <span>Ativos & Vídeos Criados ({opportunities.length})</span>
         </button>
 
         <button
@@ -148,20 +148,20 @@ export default function App() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
                   <TrendingUp className="w-4 h-4" />
-                  <span>Produtos, Páginas e Guiões Multimédia</span>
+                  <span>Conteúdos Visuais e Vídeos Produzidos</span>
                 </div>
               </div>
 
               {opportunities.length === 0 ? (
                 <div className="py-12 text-center text-slate-500 text-sm">
-                  A carregar dados do Supabase...
+                  Nenhum ativo gerado ainda. Pede no prompt abaixo ou aguarda o radar autónomo.
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {opportunities.map((opp) => {
                     const publicUrl = `${BACKEND_URL}/p/${opp.id}`;
                     return (
-                      <div key={opp.id} className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-3">
+                      <div key={opp.id} className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-4">
                         <div className="flex items-start justify-between gap-4">
                           <div>
                             <div className="flex items-center gap-2">
@@ -179,23 +179,36 @@ export default function App() {
                           </span>
                         </div>
 
-                        {opp.summary && (
-                          <p className="text-xs text-slate-400 leading-relaxed">
-                            {opp.summary}
-                          </p>
-                        )}
-
-                        {opp.product_concept && (
-                          <div className="p-2.5 bg-indigo-950/30 border border-indigo-500/20 rounded-lg flex items-start gap-2">
-                            <Package className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
-                            <div className="text-xs text-indigo-200 leading-relaxed">
-                              <span className="font-semibold text-indigo-300">Produto: </span>
-                              {opp.product_concept}
+                        {/* Bloco Visual: Capa IA + Player de Vídeo TikTok */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                          {opp.image_url && (
+                            <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex flex-col justify-between">
+                              <span className="text-[11px] font-semibold text-amber-400 flex items-center gap-1 mb-2">
+                                <ImageIcon className="w-3.5 h-3.5" /> Capa / Mockup do Produto
+                              </span>
+                              <img
+                                src={opp.image_url}
+                                alt={opp.title}
+                                className="w-full h-40 object-cover rounded-lg border border-slate-800"
+                              />
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        {/* Landing Page Pública */}
+                          {opp.video_url && (
+                            <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex flex-col justify-between">
+                              <span className="text-[11px] font-semibold text-rose-400 flex items-center gap-1 mb-2">
+                                <Video className="w-3.5 h-3.5" /> Vídeo TikTok / Reels (MP4)
+                              </span>
+                              <video
+                                src={opp.video_url}
+                                controls
+                                className="w-full h-40 object-cover rounded-lg bg-black border border-slate-800"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Landing Page Link */}
                         {opp.landing_page_html && (
                           <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div className="flex items-center gap-2 text-xs font-medium text-cyan-400">
@@ -217,108 +230,46 @@ export default function App() {
                                 className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800 px-2 py-1 rounded transition"
                               >
                                 {copiedId === `link-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Link className="w-3 h-3" />}
-                                <span>{copiedId === `link-${opp.id}` ? "Link Copiado!" : "Copiar Link"}</span>
+                                <span>{copiedId === `link-${opp.id}` ? "Copiado!" : "Copiar Link"}</span>
                               </button>
                             </div>
                           </div>
                         )}
 
-                        {/* Guião TikTok / Reels */}
+                        {/* Guião de Vídeo Expandido */}
                         {opp.video_script && (
-                          <div className="p-3 bg-rose-950/20 border border-rose-500/20 rounded-lg space-y-2">
+                          <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-400">
-                                <Video className="w-3.5 h-3.5" /> Guião TikTok / Reels / Shorts (30s)
+                                <Video className="w-3.5 h-3.5" /> Guião de Narração (30s)
                               </span>
                               <button
                                 onClick={() => handleCopy(opp.video_script, `video-${opp.id}`)}
-                                className="text-xs text-rose-300 hover:text-white flex items-center gap-1 bg-rose-950/60 border border-rose-500/30 px-2 py-0.5 rounded transition"
+                                className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded transition"
                               >
                                 {copiedId === `video-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedId === `video-${opp.id}` ? "Guião Copiado!" : "Copiar Guião"}</span>
+                                <span>{copiedId === `video-${opp.id}` ? "Copiado!" : "Copiar Guião"}</span>
                               </button>
                             </div>
-                            <p className="text-xs text-rose-200/90 whitespace-pre-wrap font-sans bg-slate-950 p-2.5 rounded border border-rose-950/40 leading-relaxed">
+                            <p className="text-xs text-slate-300 whitespace-pre-wrap font-sans bg-slate-950 p-2.5 rounded border border-slate-900 leading-relaxed">
                               {opp.video_script}
                             </p>
                           </div>
                         )}
 
-                        {/* Prompt de Imagem/Vídeo IA */}
-                        {opp.ai_media_prompt && (
-                          <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 text-xs font-medium text-amber-400">
-                              <ImageIcon className="w-3.5 h-3.5 shrink-0" />
-                              <span className="truncate max-w-[280px] sm:max-w-md text-amber-200/80 font-mono text-[11px]">Prompt Midjourney: {opp.ai_media_prompt}</span>
-                            </div>
-                            <button
-                              onClick={() => handleCopy(opp.ai_media_prompt, `media-${opp.id}`)}
-                              className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded transition shrink-0"
-                            >
-                              {copiedId === `media-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                              <span>{copiedId === `media-${opp.id}` ? "Copiado!" : "Copiar Prompt"}</span>
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Cold Email B2B */}
-                        {opp.cold_email && (
-                          <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
-                              <Mail className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                              <span className="truncate max-w-[280px] sm:max-w-md text-slate-400 text-[11px]">Email Outreach B2B</span>
-                            </div>
-                            <button
-                              onClick={() => handleCopy(opp.cold_email, `email-${opp.id}`)}
-                              className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded transition shrink-0"
-                            >
-                              {copiedId === `email-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                              <span>{copiedId === `email-${opp.id}` ? "Copiado!" : "Copiar Email"}</span>
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Código Fonte */}
-                        {opp.code_payload && (
-                          <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg">
-                            <div className="flex items-center justify-between">
-                              <button
-                                onClick={() => setOpenCodeId(openCodeId === opp.id ? null : opp.id)}
-                                className="text-xs font-medium text-emerald-400 flex items-center gap-1.5 hover:underline"
-                              >
-                                <Code2 className="w-3.5 h-3.5" />
-                                <span>{openCodeId === opp.id ? "Ocultar Código" : "Ver Código do Produto"}</span>
-                                {openCodeId === opp.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                              </button>
-                              <button
-                                onClick={() => handleCopy(opp.code_payload, `code-${opp.id}`)}
-                                className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded transition"
-                              >
-                                {copiedId === `code-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedId === `code-${opp.id}` ? "Copiado!" : "Copiar Código"}</span>
-                              </button>
-                            </div>
-                            {openCodeId === opp.id && (
-                              <pre className="mt-2 p-3 bg-slate-950 text-emerald-300 text-[11px] font-mono rounded overflow-x-auto border border-slate-900 whitespace-pre-wrap">
-                                {opp.code_payload}
-                              </pre>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Post para Redes Sociais */}
+                        {/* Post de Redes */}
                         {opp.social_post && (
-                          <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-lg space-y-2">
+                          <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
-                                <Share2 className="w-3 h-3 text-cyan-400" /> Post Pronto (LinkedIn / X)
+                                <Share2 className="w-3 h-3 text-cyan-400" /> Post Pronto com Link
                               </span>
                               <button
                                 onClick={() => handleCopy(`${opp.social_post}\n\n👉 Acede aqui: ${publicUrl}`, `post-${opp.id}`)}
-                                className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800/80 px-2 py-0.5 rounded transition"
+                                className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded transition"
                               >
                                 {copiedId === `post-${opp.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedId === `post-${opp.id}` ? "Copiado com Link!" : "Copiar Post + Link"}</span>
+                                <span>{copiedId === `post-${opp.id}` ? "Copiado!" : "Copiar Post"}</span>
                               </button>
                             </div>
                             <p className="text-xs text-slate-300 whitespace-pre-wrap font-sans bg-slate-950 p-2.5 rounded border border-slate-900">
@@ -344,7 +295,7 @@ export default function App() {
 
               {leads.length === 0 ? (
                 <div className="py-12 text-center text-slate-500 text-sm">
-                  Nenhum lead capturado ainda. Partilha os vídeos do TikTok e os posts com o link público para começar a receber inscrições!
+                  Nenhum lead capturado ainda.
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -365,19 +316,19 @@ export default function App() {
           )}
         </div>
 
-        {/* Prompt Lateral */}
+        {/* Painel Lateral */}
         <div className="space-y-6">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
             <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm mb-4">
               <Bot className="w-4 h-4 text-emerald-400" />
-              <span>Prompt Estratégico Multimédia</span>
+              <span>Criador de Mídia e Vídeo Sob Pedido</span>
             </div>
 
             <form onSubmit={handleAskAgent} className="space-y-3">
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Ex: Cria um vídeo viral para o TikTok sobre uma ferramenta de transcrição..."
+                placeholder="Ex: Cria uma ferramenta em Python para transcrever reuniões e gera o vídeo do TikTok..."
                 rows={4}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none"
               />
@@ -391,7 +342,7 @@ export default function App() {
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    <span>Executar Agente</span>
+                    <span>Produzir Conteúdo Agora</span>
                   </>
                 )}
               </button>
