@@ -103,7 +103,7 @@ async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Orde
     """
     
     completion = ai.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[
             {"role": "system", "content": "És um programador senior e copywriter de conversão. Deves responder estritamente num objeto JSON válido."},
             {"role": "user", "content": prompt}
@@ -113,6 +113,8 @@ async def build_product_asset_pipeline(ai: Groq, topic: str, source: str = "Orde
     )
     
     raw_content = completion.choices[0].message.content
+    if "</think>" in raw_content:
+        raw_content = raw_content.split("</think>")[-1].strip()
     data = json.loads(raw_content)
 
     title = data.get("title", "SaaSPro")
